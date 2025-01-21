@@ -50,12 +50,14 @@ namespace Latios.MecanimV2
 
         public struct LayerMetadata
         {
-            public float                  originalLayerWeight;
-            public bool                   performIKPass;
-            public bool                   isSyncLayer;
-            public bool                   syncLayerUsesBlendedTimings;
-            public bool                   useAdditiveBlending;  // If false, use override. Override is more common.
-            public int                    realLayerIndex;  // The non-sync state machine layer index, either directly used by a non-sync layer or referenced by the sync layer.
+            public float originalLayerWeight;
+            public short realLayerIndex;  // The non-sync state machine layer index, either directly used by a non-sync layer or referenced by the sync layer.
+            public short boneMaskIndex;  // Index in BoneMaskSetBlob
+            public bool  performIKPass;
+            public bool  isSyncLayer;
+            public bool  syncLayerUsesBlendedTimings;
+            public bool  useAdditiveBlending;  // If false, use override. Override is more common.
+
             public BlobArray<MotionIndex> motionIndices;  // Sync layers can have completely separate blend trees
             public FixedString128Bytes    name;
         }
