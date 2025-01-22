@@ -281,19 +281,27 @@ namespace Latios.MecanimV2.Authoring.Systems
 
         private static void BakeParameters(AnimatorController animatorController, ref BlobBuilder builder, ref MecanimControllerBlob blobAnimatorController)
         {
-            BlobBuilderArray<int> parameterNameHashes =
-                builder.Allocate(ref blobAnimatorController.parameterNameHashes, animatorController.parameters.Length);
-            BlobBuilderArray<int> parameterEditorNameHashes =
-                builder.Allocate(ref blobAnimatorController.parameterEditorNameHashes, animatorController.parameters.Length);
-            BlobBuilderArray<FixedString64Bytes> parameterNames =
-                builder.Allocate(ref blobAnimatorController.parameterNames, animatorController.parameters.Length);
+            var parametersCount = animatorController.parameters.Length;
+            
+            blobAnimatorController.parameterTypes = new MecanimControllerBlob.ParameterTypes();
+            BlobBuilderArray<int> packedTypes = 
+                builder.Allocate(
+                    ref blobAnimatorController.parameterTypes.packedTypes, 
+                    MecanimControllerBlob.ParameterTypes.PackedTypesArrayLength(parametersCount));
 
-            // Bake parameter names and hashes
-            for (int i = 0; i < animatorController.parameters.Length; i++)
+            BlobBuilderArray<int> parameterNameHashes = builder.Allocate(ref blobAnimatorController.parameterNameHashes, parametersCount);
+            BlobBuilderArray<int> parameterEditorNameHashes = builder.Allocate(ref blobAnimatorController.parameterEditorNameHashes, parametersCount);
+            BlobBuilderArray<FixedString64Bytes> parameterNames = builder.Allocate(ref blobAnimatorController.parameterNames, parametersCount);
+            
+            // Bake parameter types names and hashes
+            for (int i = 0; i < parametersCount; i++)
             {
                 var parameter = animatorController.parameters[i];
 
                 int nameHash = parameter.name.GetHashCode();
+
+                MecanimControllerBlob.ParameterTypes.PackTypeIntoBlobBuilder(ref packedTypes, i, parameter.type);
+                
                 parameterNameHashes[i] = nameHash;
                 parameterEditorNameHashes[i] = nameHash;
                 parameterNames[i] = parameter.name;

@@ -1,6 +1,7 @@
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace Latios.MecanimV2
 {
@@ -21,14 +22,39 @@ namespace Latios.MecanimV2
         public struct ParameterTypes
         {
             public BlobArray<int> packedTypes;
-            public Type this[int index] => (Type)Bits.GetBits(packedTypes[index >> 4], (index & 0xf) << 1, 2);
-
+            public Type this[int index] => (Type) Bits.GetBits(packedTypes[index >> 4], (index & 0xf) << 1, 2);
+            
             public enum Type : byte
             {
                 Float = 0,
                 Int = 1,
                 Bool = 2,
                 Trigger = 3,
+            }
+            
+            // Calculates the number of ints needed in the packedTypes blob array to represent all the parameter types
+            public static int PackedTypesArrayLength(int parametersCount)
+            {
+                return (parametersCount + 15) >> 4;
+            }
+            
+            // Packs a UnityEngine.AnimatorControllerParameterType as 2 bits in the right position of a packedTypes blob array builder
+            public static void PackTypeIntoBlobBuilder(ref BlobBuilderArray<int> packedTypesBlobBuilderArray, int parameterIndex, AnimatorControllerParameterType parameterType)
+            {
+                Bits.SetBits(ref packedTypesBlobBuilderArray[parameterIndex >> 4], (parameterIndex & 0xf) << 1, 2, (byte) FromAnimatorParameterType(parameterType));
+            }
+            
+            // Maps Unity animator parameter types to our ParameterTypes.Type enum values.
+            public static Type FromAnimatorParameterType(AnimatorControllerParameterType unityType) {
+                switch (unityType)
+                {
+                    case AnimatorControllerParameterType.Bool: return Type.Bool;
+                    case AnimatorControllerParameterType.Int: return Type.Int;
+                    case AnimatorControllerParameterType.Float: return Type.Float;
+                    case AnimatorControllerParameterType.Trigger: return Type.Trigger;
+                }
+                throw new System.Exception(
+                    $"Encountered unknown animator parameter type {unityType}. If you see this, please report a bug to the Latios Framework developers.");
             }
         }
 
