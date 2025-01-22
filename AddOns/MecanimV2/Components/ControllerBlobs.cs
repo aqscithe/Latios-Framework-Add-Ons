@@ -165,7 +165,7 @@ namespace Latios.MecanimV2
             public short motionTimeOverrideParameterIndex;
 
             public short  motionIndexInLayer;  // This indexes the motionIndices array in LayerMetadata
-            public ushort packedFlags;
+            private ushort packedFlags;
             public bool useFootIK  // Not supported at runtime yet
             {
                 get => Bits.GetBit(packedFlags, 0);
