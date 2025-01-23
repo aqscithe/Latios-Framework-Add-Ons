@@ -77,7 +77,8 @@ namespace Latios.MecanimV2
         public struct Layer
         {
             public float originalLayerWeight; // TODO: should this just be called weight and represent the weight of the current layer now?
-            public short stateMachineIndex;  // The non-sync state machine layer index, either directly used by a non-sync layer or referenced by the sync layer.
+            public short syncLayerIndex;  // The index of the layer we are syncing with (-1 when this is not a sync layer)
+            public short stateMachineIndex;  // The state machine layer index this layer uses
             public short boneMaskIndex;  // Index in BoneMaskSetBlob
             public bool  performIKPass;
             public bool  isSyncLayer;

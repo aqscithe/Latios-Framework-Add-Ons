@@ -191,7 +191,7 @@ namespace Latios.MecanimV2.Authoring.Systems
                                                                        AnimationClip[]                clips,
                                                                        AnimatorControllerParameter[]  parameters)
         {
-            // TODO: stateMachineBlob.influencingSyncLayers = 
+            // TODO: bake initializationEntryStateTransitions
             
             //Gather states motions for reference
             var states = layer.stateMachine.states.Select(x => x.state).ToArray();
@@ -206,16 +206,28 @@ namespace Latios.MecanimV2.Authoring.Systems
             BlobBuilderArray<MecanimControllerBlob.State> statesBuilder =
                 builder.Allocate(ref stateMachineBlob.states, states.Length);
             
+            BlobBuilderArray<int> stateNameHashesBuilder =
+                builder.Allocate(ref stateMachineBlob.stateNameHashes, states.Length);
+            BlobBuilderArray<int> stateNameEditorHashesBuilder =
+                builder.Allocate(ref stateMachineBlob.stateNameEditorHashes, states.Length);
+            BlobBuilderArray<FixedString128Bytes> stateNamesBuilder =
+                builder.Allocate(ref stateMachineBlob.stateNames, states.Length);
+            BlobBuilderArray<FixedString128Bytes> stateTagsBuilder =
+                builder.Allocate(ref stateMachineBlob.stateTags, states.Length);
+            
             for (int i = 0; i < states.Length; i++)
             {
-                // TODO: do we still need to save the default state here? seems like that field is gone now and we will use the transitions?
-
                 ref var stateBlob = ref statesBuilder[i];
                 BakeAnimatorStateMachineState(ref builder, ref stateBlob, states[i].motion, states[i], childMotions, parameters, clips);
+
+                stateNameHashesBuilder[i] = states[i].name.GetHashCode();
+                stateNameEditorHashesBuilder[i] = states[i].name.GetHashCode();
+                stateNamesBuilder[i] = states[i].name;
+                stateTagsBuilder[i] = states[i].tag;
+                
                 statesBuilder[i] = stateBlob;
             }
-
-
+            
             //Transitions
             BlobBuilderArray<MecanimControllerBlob.Transition> anyStateTransitionsBuilder =
                 builder.Allocate(ref stateMachineBlob.anyStateTransitions, layer.stateMachine.anyStateTransitions.Length);
@@ -232,6 +244,7 @@ namespace Latios.MecanimV2.Authoring.Systems
         private MecanimControllerBlob.Layer BakeAnimatorControllerLayer(ref BlobBuilder builder,
                                                                        ref MecanimControllerBlob.Layer layerBlob,
                                                                        AnimatorControllerLayer layer,
+                                                                       short stateMachineIndex,
                                                                        AnimationClip[]                clips,
                                                                        AnimatorControllerParameter[]  parameters)
         {
@@ -240,11 +253,12 @@ namespace Latios.MecanimV2.Authoring.Systems
             layerBlob.performIKPass               = layer.iKPass;
             layerBlob.useAdditiveBlending         = layer.blendingMode == AnimatorLayerBlendingMode.Additive;
             layerBlob.syncLayerUsesBlendedTimings = layer.syncedLayerAffectsTiming;
+
+            layerBlob.stateMachineIndex           = stateMachineIndex;
+            layerBlob.isSyncLayer                 = layer.syncedLayerIndex != -1;
+            layerBlob.syncLayerIndex              = (short) layer.syncedLayerIndex;
             
-            //TODO: layerBlob.stateMachineIndex
-            //TODO: layerBlob.isSyncLayer         
             //TODO: layerBlob.boneMaskIndex
-            
             //TODO: layerBlob.motionIndices
             
             return layerBlob;
@@ -252,30 +266,134 @@ namespace Latios.MecanimV2.Authoring.Systems
 
         private BlobAssetReference<MecanimControllerBlob> BakeAnimatorController(AnimatorController animatorController)
         {
-            var builder                = new BlobBuilder(Allocator.Temp);
+            var builder                    = new BlobBuilder(Allocator.Temp);
             ref var blobAnimatorController = ref builder.ConstructRoot<MecanimControllerBlob>();
-            blobAnimatorController.name = animatorController.name;
-
+            blobAnimatorController.name    = animatorController.name;
+            
             BlobBuilderArray<MecanimControllerBlob.StateMachine> stateMachinesBuilder =
-                builder.Allocate(ref blobAnimatorController.stateMachines, animatorController.layers.Length);
+                builder.Allocate(ref blobAnimatorController.stateMachines, GetStateMachinesCount(animatorController.layers));
             BlobBuilderArray<MecanimControllerBlob.Layer> layersBuilder =
                 builder.Allocate(ref blobAnimatorController.layers, animatorController.layers.Length);
             
-            for (int i = 0; i < animatorController.layers.Length; i++)
-            {
-                ref var stateMachineBlob = ref stateMachinesBuilder[i];
-                BakeAnimatorControllerStateMachine(ref builder, ref stateMachineBlob, animatorController.layers[i], animatorController.animationClips, animatorController.parameters);
-                
-                ref var layerBlob = ref layersBuilder[i];
-                BakeAnimatorControllerLayer(ref builder, ref layerBlob, animatorController.layers[i], animatorController.animationClips, animatorController.parameters);
-                stateMachinesBuilder[i] = stateMachineBlob;
-            }
+            NativeHashMap<short, short> owningLayerToStateMachine = new NativeHashMap<short, short>(1, Allocator.Temp);
+            
+            builder = BakeStateMachines(animatorController, ref owningLayerToStateMachine, ref stateMachinesBuilder, ref builder);
+
+            builder = BakeLayers(animatorController, ref owningLayerToStateMachine, ref layersBuilder, ref builder);
 
             BakeParameters(animatorController, ref builder, ref blobAnimatorController);
 
             var result = builder.CreateBlobAssetReference<MecanimControllerBlob>(Allocator.Persistent);
 
             return result;
+        }
+
+        private BlobBuilder BakeLayers(
+            AnimatorController animatorController,
+            ref NativeHashMap<short, short> owningLayerToStateMachine,
+            ref BlobBuilderArray<MecanimControllerBlob.Layer> layersBuilder,
+            ref BlobBuilder builder)
+        {
+            for (short i = 0; i < animatorController.layers.Length; i++)
+            {
+                var layer = animatorController.layers[i];
+
+                // Get the state machine index using the current layer index, or the layer index we are syncing with
+                short stateMachineIndex = owningLayerToStateMachine[(short) (layer.syncedLayerIndex == -1 ? i : layer.syncedLayerIndex)]; 
+
+                ref var layerBlob = ref layersBuilder[i];
+                BakeAnimatorControllerLayer(ref builder, ref layerBlob, layer, stateMachineIndex, animatorController.animationClips, animatorController.parameters);
+                layersBuilder[i] = layerBlob;
+            }
+
+            return builder;
+        }
+
+        private int GetStateMachinesCount(AnimatorControllerLayer[] animatorControllerLayers)
+        {
+            int stateMachinesCount = 0;
+            foreach (var animatorControllerLayer in animatorControllerLayers)
+            {
+                if (animatorControllerLayer.syncedLayerIndex == -1)
+                {
+                    stateMachinesCount++;
+                }
+            }
+
+            return stateMachinesCount;
+        }
+        
+        private BlobBuilder BakeStateMachines(
+            AnimatorController animatorController,
+            ref NativeHashMap<short, short> owningLayerToStateMachine,
+            ref BlobBuilderArray<MecanimControllerBlob.StateMachine> stateMachinesBuilder,
+            ref BlobBuilder builder)
+        {
+            NativeParallelMultiHashMap<short, short> layersInfluencingTimingsByAffectedLayer = new NativeParallelMultiHashMap<short, short>(1, Allocator.Temp);
+            
+            short stateMachinesAdded = 0;
+            for (short i = 0; i < animatorController.layers.Length; i++)
+            {
+                var layer = animatorController.layers[i];
+
+                if (layer.syncedLayerIndex == -1)
+                {
+                    // Not a synced layer, add new state machine
+                    ref var stateMachineBlob = ref stateMachinesBuilder[stateMachinesAdded];
+                    BakeAnimatorControllerStateMachine(ref builder, ref stateMachineBlob, layer, animatorController.animationClips, animatorController.parameters);
+                    stateMachinesBuilder[stateMachinesAdded] = stateMachineBlob;
+                    
+                    // Associate the index of this layer with its state machine index for easier lookups
+                    owningLayerToStateMachine.Add(i, stateMachinesAdded);
+
+                    
+                    
+                    stateMachinesAdded++;
+                } else if (layer.syncedLayerAffectsTiming)
+                {
+                    // This is a synced layer that affects timings. Save it as an influencing layer for the layer it's syncing with.
+                    layersInfluencingTimingsByAffectedLayer.Add((short) layer.syncedLayerIndex, i);
+                }
+            }
+            
+            PopulateLayersAffectingStateMachinesTimings(animatorController, owningLayerToStateMachine, ref stateMachinesBuilder, builder, layersInfluencingTimingsByAffectedLayer);
+            
+            return builder;
+        }
+
+        private static void PopulateLayersAffectingStateMachinesTimings(
+            AnimatorController animatorController,
+            NativeHashMap<short, short> owningLayerToStateMachine,
+            ref BlobBuilderArray<MecanimControllerBlob.StateMachine> stateMachinesBuilder,
+            BlobBuilder builder,
+            NativeParallelMultiHashMap<short, short> layersInfluencingTimingsByAffectedLayer)
+        {
+            // Populate list of layers that affects each state machine timings.
+            for (short i = 0; i < animatorController.layers.Length; i++)
+            {
+                if (!owningLayerToStateMachine.ContainsKey(i)) continue;
+
+                int influencingLayersCount = layersInfluencingTimingsByAffectedLayer.CountValuesForKey(i);
+                if (influencingLayersCount == 0) continue;
+
+                // Get associated state machine blob
+                ref var stateMachineBlob = ref stateMachinesBuilder[owningLayerToStateMachine[i]];
+
+                // initialize the blob array for layers affecting timings on the state machine blob
+                BlobBuilderArray<short> influencingLayersBuilder = builder.Allocate(ref stateMachineBlob.influencingSyncLayers, influencingLayersCount);
+
+                var indexInArrayOfInfluencingLayers = 0;
+                if (layersInfluencingTimingsByAffectedLayer.TryGetFirstValue(i, out short influencingLayer, out NativeParallelMultiHashMapIterator<short> it))
+                {
+                    do
+                    {
+                        influencingLayersBuilder[indexInArrayOfInfluencingLayers] = influencingLayer;
+                        indexInArrayOfInfluencingLayers++;
+                    } while (layersInfluencingTimingsByAffectedLayer.TryGetNextValue(out influencingLayer, ref it));
+                }
+
+                stateMachinesBuilder[owningLayerToStateMachine[i]] = stateMachineBlob;
+            }
         }
 
         private static void BakeParameters(AnimatorController animatorController, ref BlobBuilder builder, ref MecanimControllerBlob blobAnimatorController)
