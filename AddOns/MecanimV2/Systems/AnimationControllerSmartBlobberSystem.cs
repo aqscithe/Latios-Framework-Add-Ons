@@ -5,6 +5,7 @@ using Latios.Authoring;
 using Latios.Authoring.Systems;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Entities.LowLevel.Unsafe;
 using UnityEditor.Animations;
@@ -105,12 +106,13 @@ namespace Latios.MecanimV2.Authoring.Systems
         
 
         private void BakeAnimatorStateMachineState(ref BlobBuilder builder,
-                                        ref MecanimControllerBlob.State blobState,
-                                        Motion motion,
-                                        AnimatorState parentState,
-                                        List<ChildMotion>             motions,
-                                        AnimatorControllerParameter[] parameters,
-                                        AnimationClip[]               clips)
+            ref MecanimControllerBlob.State blobState,
+            short stateIndexInStateMachine,
+            Motion motion,
+            AnimatorState parentState,
+            List<ChildMotion> motions,
+            AnimatorControllerParameter[] parameters,
+            AnimationClip[] clips)
         {
             blobState.baseStateSpeed                = parentState.speed;
             blobState.motionCycleOffset             = parentState.cycleOffset;
@@ -119,6 +121,9 @@ namespace Latios.MecanimV2.Authoring.Systems
             blobState.useFootIK                     = parentState.iKOnFeet;
 
             blobState.stateSpeedMultiplierParameterIndex = -1;
+
+            blobState.stateIndexInStateMachine = stateIndexInStateMachine;
+            
             if (parentState.speedParameterActive)
             {
                 for (int i = 0; i < parameters.Length; i++)
@@ -169,22 +174,10 @@ namespace Latios.MecanimV2.Authoring.Systems
                     }
                 }
             }
-
-            
-            //Get the clip index
-            blobState.motionIndexInLayer = -1;
-            for (int i = 0; i < clips.Length; i++)
-            {
-                if (clips[i] == motion)
-                {
-                    blobState.motionIndexInLayer = (short)i;
-                    break;
-                }
-            }
         }
 
         List<ChildMotion> m_motionCache = new List<ChildMotion>();
-
+        
         private MecanimControllerBlob.StateMachine BakeAnimatorControllerStateMachine(ref BlobBuilder builder,
                                                                        ref MecanimControllerBlob.StateMachine stateMachineBlob,
                                                                        AnimatorControllerLayer layer,
@@ -215,10 +208,10 @@ namespace Latios.MecanimV2.Authoring.Systems
             BlobBuilderArray<FixedString128Bytes> stateTagsBuilder =
                 builder.Allocate(ref stateMachineBlob.stateTags, states.Length);
             
-            for (int i = 0; i < states.Length; i++)
+            for (short i = 0; i < states.Length; i++)
             {
                 ref var stateBlob = ref statesBuilder[i];
-                BakeAnimatorStateMachineState(ref builder, ref stateBlob, states[i].motion, states[i], childMotions, parameters, clips);
+                BakeAnimatorStateMachineState(ref builder, ref stateBlob, i, states[i].motion, states[i], childMotions, parameters, clips);
 
                 stateNameHashesBuilder[i] = states[i].name.GetHashCode();
                 stateNameEditorHashesBuilder[i] = states[i].name.GetHashCode();
@@ -263,12 +256,19 @@ namespace Latios.MecanimV2.Authoring.Systems
             
             return layerBlob;
         }
-
+        
         private BlobAssetReference<MecanimControllerBlob> BakeAnimatorController(AnimatorController animatorController)
         {
             var builder                    = new BlobBuilder(Allocator.Temp);
             ref var blobAnimatorController = ref builder.ConstructRoot<MecanimControllerBlob>();
             blobAnimatorController.name    = animatorController.name;
+
+            UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap = new UnsafeHashMap<UnityObjectRef<AnimationClip>, int>(1, Allocator.Temp);
+            BuildClipMotionIndicesHashes(animatorController, ref animationClipIndicesHashMap);
+
+            UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap = new UnsafeHashMap<UnityObjectRef<BlendTree>, int>(1, Allocator.Temp);
+            BakeBlendTrees(ref builder, ref blobAnimatorController, animatorController, ref blendTreeIndicesHashMap, in animationClipIndicesHashMap);
+            
             
             BlobBuilderArray<MecanimControllerBlob.StateMachine> stateMachinesBuilder =
                 builder.Allocate(ref blobAnimatorController.stateMachines, GetStateMachinesCount(animatorController.layers));
@@ -286,6 +286,103 @@ namespace Latios.MecanimV2.Authoring.Systems
             var result = builder.CreateBlobAssetReference<MecanimControllerBlob>(Allocator.Persistent);
 
             return result;
+        }
+
+        private void BuildClipMotionIndicesHashes(AnimatorController animatorController, ref UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap)
+        {
+            // Save indices for each AnimationClip in a hashmap for easy lookups while baking layers and blend trees
+            foreach (var clip in animatorController.animationClips)
+            {
+                animationClipIndicesHashMap.TryAdd(clip, animationClipIndicesHashMap.Count);
+            }
+        }
+        
+        private void BakeBlendTrees(ref BlobBuilder builder, ref MecanimControllerBlob blobAnimatorController, AnimatorController animatorController, ref UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap, in UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap)
+        {
+            // Save BlendTrees and their indices for all blend trees for easy lookups while baking layers and blend trees
+            foreach (var layer in animatorController.layers)
+            {
+                foreach (var state in layer.stateMachine.states)
+                {
+                    Motion stateMotion = state.state.motion;
+
+                    if (stateMotion is BlendTree blendTree)
+                    {
+                        AddBlendTreesToIndicesHashMapRecursively(blendTree, ref blendTreeIndicesHashMap);
+                    }
+                }
+            }
+
+            BlobBuilderArray<MecanimControllerBlob.BlendTree> blendTreesBuilder = builder.Allocate(ref blobAnimatorController.blendTrees, blendTreeIndicesHashMap.Count);
+            
+            // Now bake all the blend trees using the populated blend tree hashmap
+            foreach (var keyPair in blendTreeIndicesHashMap)
+            {
+                BlendTree blendTree = keyPair.Key;
+                int blendTreeIndex = keyPair.Value;
+                
+                BakeBlendTree(blendTree, blendTreeIndex, ref builder, ref blendTreesBuilder, in blendTreeIndicesHashMap, in animationClipIndicesHashMap);
+            }
+        }
+
+        private void BakeBlendTree(BlendTree blendTree, int blendTreeIndex, ref BlobBuilder builder, ref BlobBuilderArray<MecanimControllerBlob.BlendTree> blendTreesBuilder, in UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap, in UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap)
+        {
+            ref MecanimControllerBlob.BlendTree blendTreeBlob = ref blendTreesBuilder[blendTreeIndex];
+            
+            blendTreeBlob.blendTreeType = MecanimControllerBlob.BlendTree.FromUnityBlendTreeType(blendTree.blendType);
+            // TODO: blendTreeBlob.parameterIndices
+            
+            var childrenBuilder = builder.Allocate(ref blendTreeBlob.children, blendTree.children.Length);
+
+            for (var childIndex = 0; childIndex < blendTree.children.Length; childIndex++)
+            {
+                var childMotion = blendTree.children[childIndex];
+                MecanimControllerBlob.BlendTree.Child childBlob = childrenBuilder[childIndex];
+
+                childBlob.cycleOffset = childMotion.cycleOffset;
+                childBlob.mirrored = childMotion.mirror;
+                childBlob.position = childMotion.position;
+                childBlob.timeScale = childMotion.timeScale;
+                childBlob.threshold = childMotion.threshold;
+
+                // TODO: childBlob.isLooping  // This doesn't seem to be available in childMotion data
+
+                // Set child motion indices for a blend tree or an animation clip
+                if (childMotion.motion is BlendTree childBlendTree)
+                {
+                    // Link to a blend tree
+                    childBlob.motionIndex = new MecanimControllerBlob.MotionIndex
+                    {
+                        isBlendTree = true,
+                        index = (ushort)blendTreeIndicesHashMap[childBlendTree],
+                    };
+                }
+                else if (childMotion.motion is AnimationClip childAnimationClip)
+                {
+                    // Link to an animation clip
+                    childBlob.motionIndex = new MecanimControllerBlob.MotionIndex
+                    {
+                        isBlendTree = false,
+                        index = (ushort)animationClipIndicesHashMap[childAnimationClip],
+                    };
+                }
+
+                childrenBuilder[childIndex] = childBlob;
+            }
+        }
+
+        private void AddBlendTreesToIndicesHashMapRecursively(BlendTree blendTree, ref UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap)
+        {
+            // If we already have this blend tree in our hashmap, we don't need to process it again
+            if (!blendTreeIndicesHashMap.TryAdd(blendTree, blendTreeIndicesHashMap.Count)) return;
+            
+            foreach (var blendTreeChild in blendTree.children)
+            {
+                if (blendTreeChild.motion is BlendTree childBlendTree)
+                {
+                    AddBlendTreesToIndicesHashMapRecursively(childBlendTree, ref blendTreeIndicesHashMap);
+                }
+            }
         }
 
         private BlobBuilder BakeLayers(

@@ -60,7 +60,7 @@ namespace Latios.MecanimV2
 
         public struct MotionIndex
         {
-            public ushort packed;
+            private ushort packed;
             public ushort index  // Either blend tree array index or index into Skeleton/ParameterClipSetBlob
             {
                 get => Bits.GetBits(packed, 0, 15);
@@ -78,7 +78,7 @@ namespace Latios.MecanimV2
         {
             public float originalLayerWeight; // TODO: should this just be called weight and represent the weight of the current layer now?
             public short syncLayerIndex;  // The index of the layer we are syncing with (-1 when this is not a sync layer)
-            public short stateMachineIndex;  // The state machine layer index this layer uses
+            public short stateMachineIndex;  // The state machine index this layer uses
             public short boneMaskIndex;  // Index in BoneMaskSetBlob
             public bool  performIKPass;
             public bool  isSyncLayer;
@@ -190,8 +190,11 @@ namespace Latios.MecanimV2
             public short motionCycleOffsetParameterIndex;
             public short mirrorParameterIndex;
             public short motionTimeOverrideParameterIndex;
+            
+            // Index of this state in the layers that use it, to access its motion,
+            // we can use layer.motionIndices[state.stateIndexInLayer]
+            public short stateIndexInStateMachine;
 
-            public short  motionIndexInLayer;  // This indexes the motionIndices array of any Layer using this state machine
             private ushort packedFlags;
             public bool useFootIK  // Not supported at runtime yet
             {
@@ -252,6 +255,7 @@ namespace Latios.MecanimV2
                 public float2      position;
                 public float       cycleOffset;
                 public float       timeScale;
+                public float       threshold;
                 public MotionIndex motionIndex;
                 public ushort      packedFlags;
                 public bool isLooping  // I don't think we can support this
@@ -265,6 +269,22 @@ namespace Latios.MecanimV2
                     set => Bits.SetBit(ref packedFlags, 1, value);
                 }
             }
+            
+#if UNITY_EDITOR
+            // Maps Unity animator parameter types to our ParameterTypes.Type enum values.
+            internal static BlendTreeType FromUnityBlendTreeType(UnityEditor.Animations.BlendTreeType unityBlendTreeType) {
+                switch (unityBlendTreeType)
+                {
+                    case UnityEditor.Animations.BlendTreeType.Simple1D: return BlendTreeType.Simple1D;
+                    case UnityEditor.Animations.BlendTreeType.SimpleDirectional2D: return BlendTreeType.SimpleDirectional2D;
+                    case UnityEditor.Animations.BlendTreeType.FreeformDirectional2D: return BlendTreeType.FreeformDirectional2D;
+                    case UnityEditor.Animations.BlendTreeType.FreeformCartesian2D: return BlendTreeType.FreeformCartesian2D;
+                    case UnityEditor.Animations.BlendTreeType.Direct: return BlendTreeType.Direct;
+                }
+                throw new System.Exception(
+                    $"Encountered unknown blend tree type {unityBlendTreeType}. If you see this, please report a bug to the Latios Framework developers.");
+            }
+#endif
         }
     }
 }
