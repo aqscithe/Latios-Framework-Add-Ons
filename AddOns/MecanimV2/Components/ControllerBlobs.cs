@@ -12,8 +12,8 @@ namespace Latios.MecanimV2
         public BlobArray<int>                parameterEditorNameHashes;  // Todo: Is it possible to match this to name hashes so we can omit this?
         public BlobArray<FixedString64Bytes> parameterNames;
 
-        public BlobArray<LayerMetadata> layerMetadatas;
-        public BlobArray<Layer>         layers;
+        public BlobArray<Layer>              layers;
+        public BlobArray<StateMachine>       stateMachines;
 
         public BlobArray<BlendTree> blendTrees;
 
@@ -74,17 +74,17 @@ namespace Latios.MecanimV2
             public bool invalid => index == 0x7fff;
         }
 
-        public struct LayerMetadata
+        public struct Layer
         {
-            public float originalLayerWeight;
-            public short realLayerIndex;  // The non-sync state machine layer index, either directly used by a non-sync layer or referenced by the sync layer.
+            public float originalLayerWeight; // TODO: should this just be called weight and represent the weight of the current layer now?
+            public short stateMachineIndex;  // The non-sync state machine layer index, either directly used by a non-sync layer or referenced by the sync layer.
             public short boneMaskIndex;  // Index in BoneMaskSetBlob
             public bool  performIKPass;
             public bool  isSyncLayer;
             public bool  syncLayerUsesBlendedTimings;
             public bool  useAdditiveBlending;  // If false, use override. Override is more common.
 
-            public BlobArray<MotionIndex> motionIndices;  // Sync layers can have completely separate blend trees
+            public BlobArray<MotionIndex> motionIndices;  // Sync layers share the same state machine with another layer but can have different motions.
             public FixedString128Bytes    name;
         }
 
@@ -190,7 +190,7 @@ namespace Latios.MecanimV2
             public short mirrorParameterIndex;
             public short motionTimeOverrideParameterIndex;
 
-            public short  motionIndexInLayer;  // This indexes the motionIndices array in LayerMetadata
+            public short  motionIndexInLayer;  // This indexes the motionIndices array of any Layer using this state machine
             private ushort packedFlags;
             public bool useFootIK  // Not supported at runtime yet
             {
@@ -205,7 +205,7 @@ namespace Latios.MecanimV2
             // There's 46 bits to spare to pad out to 32 bytes.
         }
 
-        public struct Layer
+        public struct StateMachine
         {
             // These are only sync layers whose weights affect timings.
             public BlobArray<short> influencingSyncLayers;

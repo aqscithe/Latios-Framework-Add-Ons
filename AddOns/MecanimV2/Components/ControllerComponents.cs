@@ -1,8 +1,6 @@
 using System.Runtime.InteropServices;
 using Latios.Kinemation;
-using Unity.Collections;
 using Unity.Entities;
-using Unity.Mathematics;
 
 namespace Latios.MecanimV2
 {
@@ -22,10 +20,10 @@ namespace Latios.MecanimV2
     }
 
     /// <summary>
-    /// The dynamic data for a non-sync layer. Sync layers do not have these associated.
+    /// The dynamic data for a state machine. Multiple layers can share the same state machine. 
     /// </summary>
     [InternalBufferCapacity(1)]
-    public struct MecanimLayerActiveStates : IBufferElementData
+    public struct MecanimStateMachineActiveStates : IBufferElementData
     {
         // Note: By using a current-next representation rather than a current-previous representation,
         // we can represent one of the state indices implicitly through the transition index, saving chunk memory
@@ -35,9 +33,9 @@ namespace Latios.MecanimV2
         public short                                 currentStateIndex;
         public MecanimControllerBlob.TransitionIndex nextStateTransitionIndex;  // Only when transition is active
 
-        public static MecanimLayerActiveStates CreateInitialState()
+        public static MecanimStateMachineActiveStates CreateInitialState()
         {
-            return new MecanimLayerActiveStates
+            return new MecanimStateMachineActiveStates
             {
                 currentStateNormalizedTime = 0f,
                 nextStateNormalizedTime    = 0f,

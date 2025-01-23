@@ -7,7 +7,6 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.LowLevel.Unsafe;
-using Unity.Mathematics;
 using UnityEditor.Animations;
 using UnityEngine;
 
@@ -105,7 +104,7 @@ namespace Latios.MecanimV2.Authoring.Systems
 
         
 
-        private void BakeAnimatorLayerState(ref BlobBuilder builder,
+        private void BakeAnimatorStateMachineState(ref BlobBuilder builder,
                                         ref MecanimControllerBlob.State blobState,
                                         Motion motion,
                                         AnimatorState parentState,
@@ -186,13 +185,13 @@ namespace Latios.MecanimV2.Authoring.Systems
 
         List<ChildMotion> m_motionCache = new List<ChildMotion>();
 
-        private MecanimControllerBlob.Layer BakeAnimatorControllerLayer(ref BlobBuilder builder,
-                                                                       ref MecanimControllerBlob.Layer layerBlob,
+        private MecanimControllerBlob.StateMachine BakeAnimatorControllerStateMachine(ref BlobBuilder builder,
+                                                                       ref MecanimControllerBlob.StateMachine stateMachineBlob,
                                                                        AnimatorControllerLayer layer,
                                                                        AnimationClip[]                clips,
                                                                        AnimatorControllerParameter[]  parameters)
         {
-            // TODO: layerBlob.influencingSyncLayers = 
+            // TODO: stateMachineBlob.influencingSyncLayers = 
             
             //Gather states motions for reference
             var states = layer.stateMachine.states.Select(x => x.state).ToArray();
@@ -205,21 +204,21 @@ namespace Latios.MecanimV2.Authoring.Systems
 
             //States
             BlobBuilderArray<MecanimControllerBlob.State> statesBuilder =
-                builder.Allocate(ref layerBlob.states, states.Length);
+                builder.Allocate(ref stateMachineBlob.states, states.Length);
             
             for (int i = 0; i < states.Length; i++)
             {
                 // TODO: do we still need to save the default state here? seems like that field is gone now and we will use the transitions?
 
                 ref var stateBlob = ref statesBuilder[i];
-                BakeAnimatorLayerState(ref builder, ref stateBlob, states[i].motion, states[i], childMotions, parameters, clips);
+                BakeAnimatorStateMachineState(ref builder, ref stateBlob, states[i].motion, states[i], childMotions, parameters, clips);
                 statesBuilder[i] = stateBlob;
             }
 
 
             //Transitions
             BlobBuilderArray<MecanimControllerBlob.Transition> anyStateTransitionsBuilder =
-                builder.Allocate(ref layerBlob.anyStateTransitions, layer.stateMachine.anyStateTransitions.Length);
+                builder.Allocate(ref stateMachineBlob.anyStateTransitions, layer.stateMachine.anyStateTransitions.Length);
             for (int i = 0; i < layer.stateMachine.anyStateTransitions.Length; i++)
             {
                 ref var anyStateTransitionBlob = ref anyStateTransitionsBuilder[i];
@@ -227,28 +226,28 @@ namespace Latios.MecanimV2.Authoring.Systems
                 anyStateTransitionsBuilder[i] = anyStateTransitionBlob;
             }
 
-            return layerBlob;
+            return stateMachineBlob;
         }
         
-        private MecanimControllerBlob.LayerMetadata BakeAnimatorControllerLayerMetadata(ref BlobBuilder builder,
-                                                                       ref MecanimControllerBlob.LayerMetadata layerMetadataBlob,
+        private MecanimControllerBlob.Layer BakeAnimatorControllerLayer(ref BlobBuilder builder,
+                                                                       ref MecanimControllerBlob.Layer layerBlob,
                                                                        AnimatorControllerLayer layer,
                                                                        AnimationClip[]                clips,
                                                                        AnimatorControllerParameter[]  parameters)
         {
-            layerMetadataBlob.name                        = layer.name;
-            layerMetadataBlob.originalLayerWeight         = layer.defaultWeight;
-            layerMetadataBlob.performIKPass               = layer.iKPass;
-            layerMetadataBlob.useAdditiveBlending         = layer.blendingMode == AnimatorLayerBlendingMode.Additive;
-            layerMetadataBlob.syncLayerUsesBlendedTimings = layer.syncedLayerAffectsTiming;
+            layerBlob.name                        = layer.name;
+            layerBlob.originalLayerWeight         = layer.defaultWeight;
+            layerBlob.performIKPass               = layer.iKPass;
+            layerBlob.useAdditiveBlending         = layer.blendingMode == AnimatorLayerBlendingMode.Additive;
+            layerBlob.syncLayerUsesBlendedTimings = layer.syncedLayerAffectsTiming;
             
-            //TODO: layerMetadataBlob.realLayerIndex
-            //TODO: layerMetadataBlob.isSyncLayer         
-            //TODO: layerMetadataBlob.boneMaskIndex
+            //TODO: layerBlob.stateMachineIndex
+            //TODO: layerBlob.isSyncLayer         
+            //TODO: layerBlob.boneMaskIndex
             
-            //TODO: layerMetadataBlob.motionIndices
+            //TODO: layerBlob.motionIndices
             
-            return layerMetadataBlob;
+            return layerBlob;
         }
 
         private BlobAssetReference<MecanimControllerBlob> BakeAnimatorController(AnimatorController animatorController)
@@ -257,19 +256,19 @@ namespace Latios.MecanimV2.Authoring.Systems
             ref var blobAnimatorController = ref builder.ConstructRoot<MecanimControllerBlob>();
             blobAnimatorController.name = animatorController.name;
 
+            BlobBuilderArray<MecanimControllerBlob.StateMachine> stateMachinesBuilder =
+                builder.Allocate(ref blobAnimatorController.stateMachines, animatorController.layers.Length);
             BlobBuilderArray<MecanimControllerBlob.Layer> layersBuilder =
                 builder.Allocate(ref blobAnimatorController.layers, animatorController.layers.Length);
-            BlobBuilderArray<MecanimControllerBlob.LayerMetadata> layersMetadatasBuilder =
-                builder.Allocate(ref blobAnimatorController.layerMetadatas, animatorController.layers.Length);
             
             for (int i = 0; i < animatorController.layers.Length; i++)
             {
+                ref var stateMachineBlob = ref stateMachinesBuilder[i];
+                BakeAnimatorControllerStateMachine(ref builder, ref stateMachineBlob, animatorController.layers[i], animatorController.animationClips, animatorController.parameters);
+                
                 ref var layerBlob = ref layersBuilder[i];
                 BakeAnimatorControllerLayer(ref builder, ref layerBlob, animatorController.layers[i], animatorController.animationClips, animatorController.parameters);
-                
-                ref var layerMetadataBlob = ref layersMetadatasBuilder[i];
-                BakeAnimatorControllerLayerMetadata(ref builder, ref layerMetadataBlob, animatorController.layers[i], animatorController.animationClips, animatorController.parameters);
-                layersBuilder[i] = layerBlob;
+                stateMachinesBuilder[i] = stateMachineBlob;
             }
 
             BakeParameters(animatorController, ref builder, ref blobAnimatorController);
