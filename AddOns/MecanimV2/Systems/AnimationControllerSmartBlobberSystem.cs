@@ -321,16 +321,30 @@ namespace Latios.MecanimV2.Authoring.Systems
                 BlendTree blendTree = keyPair.Key;
                 int blendTreeIndex = keyPair.Value;
                 
-                BakeBlendTree(blendTree, blendTreeIndex, ref builder, ref blendTreesBuilder, in blendTreeIndicesHashMap, in animationClipIndicesHashMap);
+                BakeBlendTree(animatorController, blendTree, blendTreeIndex, ref builder, ref blendTreesBuilder, in blendTreeIndicesHashMap, in animationClipIndicesHashMap);
             }
         }
 
-        private void BakeBlendTree(BlendTree blendTree, int blendTreeIndex, ref BlobBuilder builder, ref BlobBuilderArray<MecanimControllerBlob.BlendTree> blendTreesBuilder, in UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap, in UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap)
+        private void BakeBlendTree(AnimatorController animatorController, BlendTree blendTree, int blendTreeIndex, ref BlobBuilder builder, ref BlobBuilderArray<MecanimControllerBlob.BlendTree> blendTreesBuilder, in UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap, in UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap)
         {
             ref MecanimControllerBlob.BlendTree blendTreeBlob = ref blendTreesBuilder[blendTreeIndex];
             
             blendTreeBlob.blendTreeType = MecanimControllerBlob.BlendTree.FromUnityBlendTreeType(blendTree.blendType);
-            // TODO: blendTreeBlob.parameterIndices
+            
+            // Bake blend tree parameters
+            NativeList<short> parameterIndices = new NativeList<short>(1, Allocator.Temp);
+            if (blendTreeBlob.blendTreeType == MecanimControllerBlob.BlendTree.BlendTreeType.Simple1D)
+            {
+                animatorController.parameters.TryGetParameter(blendTree.blendParameter, out short conditionParameterIndex);
+                parameterIndices.Add(conditionParameterIndex);
+            }
+            else if (blendTreeBlob.blendTreeType != MecanimControllerBlob.BlendTree.BlendTreeType.Direct)
+            {
+                animatorController.parameters.TryGetParameter(blendTree.blendParameter, out short conditionParameterIndex);
+                parameterIndices.Add(conditionParameterIndex);
+                animatorController.parameters.TryGetParameter(blendTree.blendParameterY, out short conditionParameterIndexY);
+                parameterIndices.Add(conditionParameterIndexY);
+            }
             
             var childrenBuilder = builder.Allocate(ref blendTreeBlob.children, blendTree.children.Length);
 
@@ -347,6 +361,13 @@ namespace Latios.MecanimV2.Authoring.Systems
 
                 // TODO: childBlob.isLooping  // This doesn't seem to be available in childMotion data
 
+                // Bake the parameter index for each child into the parameters array if the blend tree is Direct type
+                if (blendTreeBlob.blendTreeType == MecanimControllerBlob.BlendTree.BlendTreeType.Direct)
+                {
+                    animatorController.parameters.TryGetParameter(childMotion.directBlendParameter, out short childParameterIndex);
+                    parameterIndices.Add(childParameterIndex);
+                }
+                
                 // Set child motion indices for a blend tree or an animation clip
                 if (childMotion.motion is BlendTree childBlendTree)
                 {
@@ -369,6 +390,8 @@ namespace Latios.MecanimV2.Authoring.Systems
 
                 childrenBuilder[childIndex] = childBlob;
             }
+
+            builder.ConstructFromNativeArray(ref blendTreeBlob.parameterIndices, parameterIndices.ToArray(Allocator.Temp));
         }
 
         private void AddBlendTreesToIndicesHashMapRecursively(BlendTree blendTree, ref UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap)
