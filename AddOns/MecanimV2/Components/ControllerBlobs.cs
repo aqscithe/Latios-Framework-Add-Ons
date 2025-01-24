@@ -60,6 +60,8 @@ namespace Latios.MecanimV2
 
         public struct MotionIndex
         {
+            private const ushort InvalidIndex = 0x7fff;
+            
             private ushort packed;
             public ushort index  // Either blend tree array index or index into Skeleton/ParameterClipSetBlob
             {
@@ -71,7 +73,13 @@ namespace Latios.MecanimV2
                 get => Bits.GetBit(packed, 15);
                 set => Bits.SetBit(ref packed, 15, value);
             }
-            public bool invalid => index == 0x7fff;
+            public bool invalid => index == InvalidIndex;
+            
+            public static MotionIndex Invalid = new MotionIndex
+            {
+                isBlendTree = false,
+                index = InvalidIndex,
+            };
         }
 
         public struct Layer
