@@ -13,7 +13,7 @@ namespace Latios.MecanimV2.Authoring
     {
         private SmartBlobberHandle<SkeletonClipSetBlob> m_clipSetBlobHandle;
         private SmartBlobberHandle<MecanimControllerBlob> m_controllerBlobHandle;
-
+        private SmartBlobberHandle<SkeletonBoneMaskSetBlob> m_avatarMasksBlobHandle;
         public bool Bake(Animator authoring, IBaker baker)
         {
             var entity = baker.GetEntity(TransformUsageFlags.Dynamic);
@@ -72,13 +72,20 @@ namespace Latios.MecanimV2.Authoring
                 }
                 parametersBuffer.Add(parameterData);
             }
-
-            // Bake layers
-            var maskCount = 0;
+            
+            // Bake avatar masks
+            var avatarMasks = new NativeList<UnityObjectRef<AvatarMask>>(1,Allocator.Temp);
+            var layers = baseAnimatorControllerRef.controller.layers;
+            foreach (var layer in layers)
+            {
+                if (layer.avatarMask == null) continue;
+                
+                avatarMasks.Add(layer.avatarMask);
+            }
 
             m_clipSetBlobHandle    = baker.RequestCreateBlobAsset(authoring, skeletonClipConfigs);
             m_controllerBlobHandle = baker.RequestCreateBlobAsset(baseAnimatorControllerRef.controller);
-            // TODO: request Bone Masks Blob
+            m_avatarMasksBlobHandle = baker.RequestCreateBlobAsset(authoring, avatarMasks.ToArray(Allocator.Temp));
             
             return true;
         }
@@ -88,7 +95,8 @@ namespace Latios.MecanimV2.Authoring
             var animatorController = entityManager.GetComponentData<MecanimController>(entity);
             animatorController.skeletonClipsBlob = m_clipSetBlobHandle.Resolve(entityManager);
             animatorController.controllerBlob = m_controllerBlobHandle.Resolve(entityManager);
-            // TODO: bake animatorController.boneMasksBlob = .Resolve(entityManager);
+            animatorController.boneMasksBlob = m_avatarMasksBlobHandle.Resolve(entityManager);
+            
             entityManager.SetComponentData(entity, animatorController);
         }
     }

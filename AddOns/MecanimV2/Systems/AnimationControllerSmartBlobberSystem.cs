@@ -251,6 +251,7 @@ namespace Latios.MecanimV2.Authoring.Systems
             ref MecanimControllerBlob.Layer layerBlob,
             AnimatorControllerLayer layer,
             short stateMachineIndex,
+            short boneMaskIndex,
             UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipsIndicesHashMap,
             UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap)
         {
@@ -263,7 +264,8 @@ namespace Latios.MecanimV2.Authoring.Systems
             layerBlob.stateMachineIndex           = stateMachineIndex;
             layerBlob.isSyncLayer                 = layer.syncedLayerIndex != -1;
             layerBlob.syncLayerIndex              = (short) layer.syncedLayerIndex;
-         
+
+            layerBlob.boneMaskIndex = boneMaskIndex;
             
             // Gather all states in the state machine (including nested state machines)
             List<StateInfo> stateInfos = new List<StateInfo>();
@@ -297,8 +299,6 @@ namespace Latios.MecanimV2.Authoring.Systems
                     motionIndicesArrayBuilder[index] = MecanimControllerBlob.MotionIndex.Invalid;
                 }
             }
-
-            //TODO: layerBlob.boneMaskIndex
             
             return layerBlob;
         }
@@ -460,16 +460,26 @@ namespace Latios.MecanimV2.Authoring.Systems
             ref BlobBuilderArray<MecanimControllerBlob.Layer> layersBuilder,
             ref BlobBuilder builder)
         {
+            short boneMasksFound = 0;
             for (short i = 0; i < animatorController.layers.Length; i++)
             {
                 var layer = animatorController.layers[i];
 
                 // Get the state machine index using the current layer index, or the layer index we are syncing with
-                short stateMachineIndex = owningLayerToStateMachine[(short) (layer.syncedLayerIndex == -1 ? i : layer.syncedLayerIndex)]; 
+                short stateMachineIndex = owningLayerToStateMachine[(short) (layer.syncedLayerIndex == -1 ? i : layer.syncedLayerIndex)];
 
+                short boneMaskIndex = -1;
+                if (layer.avatarMask != null)
+                {
+                    boneMaskIndex = boneMasksFound;
+                    boneMasksFound++;
+                }
+                
                 ref var layerBlob = ref layersBuilder[i];
-                BakeAnimatorControllerLayer(ref builder, ref layerBlob, layer, stateMachineIndex, animationClipIndicesHashMap, blendTreeIndicesHashMap);
+                BakeAnimatorControllerLayer(ref builder, ref layerBlob, layer, stateMachineIndex, boneMaskIndex, animationClipIndicesHashMap, blendTreeIndicesHashMap);
                 layersBuilder[i] = layerBlob;
+
+                
             }
 
             return builder;
