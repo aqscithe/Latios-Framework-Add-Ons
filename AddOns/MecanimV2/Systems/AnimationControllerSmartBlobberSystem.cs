@@ -1,6 +1,5 @@
 ﻿#if UNITY_EDITOR
 using System.Collections.Generic;
-using System.Linq;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
 using Unity.Burst;
@@ -11,8 +10,6 @@ using Unity.Entities.LowLevel.Unsafe;
 using UnityEditor.Animations;
 using UnityEngine;
 
-// Todo: This blob building system is very heavy on allocations with the use of Linq.
-// It may be worth optimizing at some point.
 
 namespace Latios.MecanimV2.Authoring.Systems
 {
@@ -70,42 +67,73 @@ namespace Latios.MecanimV2.Authoring.Systems
             blobAnimatorCondition.compareValue = new MecanimParameter { floatParam = condition.threshold };
         }
 
-        private void BakeAnimatorStateTransition(ref BlobBuilder builder, ref MecanimControllerBlob.Transition blobTransition, AnimatorStateTransition transition,
-                                                 List<StateInfo> states, AnimatorControllerParameter[] parameters)
+        private void BakeAnimatorStateTransition(ref BlobBuilder builder,
+            ref MecanimControllerBlob.Transition blobTransition,
+            AnimatorTransitionBase transition,
+            int destinationStateIndex, 
+            AnimatorControllerParameter[] parameters)
         {
-            blobTransition.hasExitTime         = transition.hasExitTime;
-            blobTransition.normalizedExitTime  = transition.exitTime / transition.duration;
-            blobTransition.normalizedOffset    = transition.offset / transition.duration;
-            blobTransition.duration            = transition.duration;
-            blobTransition.interruptionSource  = (MecanimControllerBlob.Transition.InterruptionSource) transition.interruptionSource;
-            blobTransition.usesOrderedInterruptions = transition.orderedInterruption;
+            blobTransition.destinationStateIndex = (short) destinationStateIndex;
+            
+            if (transition is AnimatorStateTransition animatorStateTransition)
+            {
+                blobTransition.hasExitTime = animatorStateTransition.hasExitTime;
+                blobTransition.normalizedExitTime = animatorStateTransition.exitTime / animatorStateTransition.duration;
+                blobTransition.normalizedOffset = animatorStateTransition.offset / animatorStateTransition.duration;
+                blobTransition.duration = animatorStateTransition.duration;
+                blobTransition.interruptionSource = (MecanimControllerBlob.Transition.InterruptionSource) animatorStateTransition.interruptionSource;
+                blobTransition.usesOrderedInterruptions = animatorStateTransition.orderedInterruption;
+            }
 
+            // Bake conditions
             BlobBuilderArray<MecanimControllerBlob.Condition> conditionsBuilder =
                 builder.Allocate(ref blobTransition.conditions, transition.conditions.Length);
             
             for (int i = 0; i < transition.conditions.Length; i++)
             {
-                var conditionBlob = conditionsBuilder[i];
-                BakeAnimatorCondition(ref conditionBlob, transition.conditions[i], parameters);
-                conditionsBuilder[i] = conditionBlob;
+                BakeAnimatorCondition(ref conditionsBuilder[i], transition.conditions[i], parameters);
             }
+        }
 
+        private static int FindDestinationStateIndexForTransition(AnimatorTransitionBase transition, List<StateInfo> states)
+        {
+            AnimatorState transitionDestinationState = transition.destinationState;
+            
+            // If it doesn't have a destination state, it's pointing to a state machine and we can get its default state
+            if (transition.destinationState == null)
+            {
+                transitionDestinationState = transition.destinationStateMachine.defaultState;
+            }
+            
             var destinationStateIndex = -1;
             for (int i = 0; i < states.Count; i++)
             {
-                if (states[i].animationState == transition.destinationState)
+                if (states[i].animationState == transitionDestinationState)
                 {
                     destinationStateIndex = i;
                     break;
                 }
             }
 
-            blobTransition.destinationStateIndex = (short)destinationStateIndex;
+            return destinationStateIndex;
+        }
+        
+        private static int FindStateIndexForState(AnimatorState state, List<StateInfo> states)
+        {
+            var destinationStateIndex = -1;
+            for (int i = 0; i < states.Count; i++)
+            {
+                if (states[i].animationState == state)
+                {
+                    destinationStateIndex = i;
+                    break;
+                }
+            }
+            return destinationStateIndex;
         }
 
-        
 
-        private void BakeAnimatorStateMachineState(
+        private void BakeState(
             ref MecanimControllerBlob.State blobState,
             short stateIndexInStateMachine,
             AnimatorState state,
@@ -173,7 +201,7 @@ namespace Latios.MecanimV2.Authoring.Systems
             }
         }
         
-        private MecanimControllerBlob.StateMachine BakeAnimatorControllerStateMachine(ref BlobBuilder builder,
+        private MecanimControllerBlob.StateMachine BakeStateMachine(ref BlobBuilder builder,
                                                                        ref MecanimControllerBlob.StateMachine stateMachineBlob,
                                                                        AnimatorControllerLayer layer,
                                                                        AnimatorControllerParameter[]  parameters)
@@ -197,29 +225,44 @@ namespace Latios.MecanimV2.Authoring.Systems
             
             for (short i = 0; i < stateInfos.Count; i++)
             {
-                ref var stateBlob = ref statesBuilder[i];
-                BakeAnimatorStateMachineState(ref stateBlob, i, stateInfos[i].animationState, parameters);
+                BakeState(ref statesBuilder[i], i, stateInfos[i].animationState, parameters);
 
                 stateNameHashesBuilder[i] = stateInfos[i].fullPathName.GetHashCode();
                 stateNameEditorHashesBuilder[i] = stateInfos[i].fullPathName.GetHashCode();
                 stateNamesBuilder[i] = stateInfos[i].fullPathName;
                 stateTagsBuilder[i] = stateInfos[i].animationState.tag;
-                
-                statesBuilder[i] = stateBlob;
             }
             
-            // TODO: bake all transitions
+            // TODO: bake all transitions (collapsing exits and entries and logging permutations as needed)
             
-            // TODO: bake initializationEntryStateTransitions (with defaults)
+            
+            // Entry state transitions
+            short defaultStateIndex = (short)FindStateIndexForState(layer.stateMachine.defaultState, stateInfos);
+            BlobBuilderArray<MecanimControllerBlob.Transition> entryTransitionsBuilder =
+                builder.Allocate(ref stateMachineBlob.initializationEntryStateTransitions, layer.stateMachine.entryTransitions.Length + 1); // we allocate one more for the default in position 0
+
+            // Add a dummy transition to the default state in position 0 of the array
+            entryTransitionsBuilder[0].destinationStateIndex = defaultStateIndex;
+            
+            for (int i = 0; i < layer.stateMachine.entryTransitions.Length; i++)
+            {
+                AnimatorTransition stateMachineEntryTransition = layer.stateMachine.entryTransitions[i];
+                
+                int stateDestinationIndex = FindDestinationStateIndexForTransition(stateMachineEntryTransition, stateInfos);
+                Debug.Log(stateDestinationIndex);
+                
+                // Default state dummy transition is in index 0. We add the rest of the entry transitions after that one.
+                BakeAnimatorStateTransition(ref builder, ref entryTransitionsBuilder[i+1], stateMachineEntryTransition, stateDestinationIndex, parameters);
+            }
             
             // Any state transitions
             BlobBuilderArray<MecanimControllerBlob.Transition> anyStateTransitionsBuilder =
                 builder.Allocate(ref stateMachineBlob.anyStateTransitions, layer.stateMachine.anyStateTransitions.Length);
             for (int i = 0; i < layer.stateMachine.anyStateTransitions.Length; i++)
             {
-                ref var anyStateTransitionBlob = ref anyStateTransitionsBuilder[i];
-                BakeAnimatorStateTransition(ref builder, ref anyStateTransitionBlob, layer.stateMachine.anyStateTransitions[i], stateInfos, parameters);
-                anyStateTransitionsBuilder[i] = anyStateTransitionBlob;
+                int stateDestinationIndex = FindDestinationStateIndexForTransition(layer.stateMachine.anyStateTransitions[i], stateInfos);
+                
+                BakeAnimatorStateTransition(ref builder, ref anyStateTransitionsBuilder[i], layer.stateMachine.anyStateTransitions[i], stateDestinationIndex, parameters);
             }
 
             return stateMachineBlob;
@@ -247,7 +290,7 @@ namespace Latios.MecanimV2.Authoring.Systems
             }
         }
         
-        private MecanimControllerBlob.Layer BakeAnimatorControllerLayer(ref BlobBuilder builder,
+        private MecanimControllerBlob.Layer BakeLayer(ref BlobBuilder builder,
             ref MecanimControllerBlob.Layer layerBlob,
             AnimatorControllerLayer layer,
             short stateMachineIndex,
@@ -475,11 +518,7 @@ namespace Latios.MecanimV2.Authoring.Systems
                     boneMasksFound++;
                 }
                 
-                ref var layerBlob = ref layersBuilder[i];
-                BakeAnimatorControllerLayer(ref builder, ref layerBlob, layer, stateMachineIndex, boneMaskIndex, animationClipIndicesHashMap, blendTreeIndicesHashMap);
-                layersBuilder[i] = layerBlob;
-
-                
+                BakeLayer(ref builder, ref layersBuilder[i], layer, stateMachineIndex, boneMaskIndex, animationClipIndicesHashMap, blendTreeIndicesHashMap);
             }
 
             return builder;
@@ -515,14 +554,10 @@ namespace Latios.MecanimV2.Authoring.Systems
                 if (layer.syncedLayerIndex == -1)
                 {
                     // Not a synced layer, add new state machine
-                    ref var stateMachineBlob = ref stateMachinesBuilder[stateMachinesAdded];
-                    BakeAnimatorControllerStateMachine(ref builder, ref stateMachineBlob, layer, animatorController.parameters);
-                    stateMachinesBuilder[stateMachinesAdded] = stateMachineBlob;
+                    BakeStateMachine(ref builder, ref stateMachinesBuilder[stateMachinesAdded], layer, animatorController.parameters);
                     
                     // Associate the index of this layer with its state machine index for easier lookups
                     owningLayerToStateMachine.Add(i, stateMachinesAdded);
-
-                    
                     
                     stateMachinesAdded++;
                 } else if (layer.syncedLayerAffectsTiming)

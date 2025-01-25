@@ -223,6 +223,7 @@ namespace Latios.MecanimV2
             public BlobArray<short> influencingSyncLayers;
             // Note: We flatten out sub-state machines.
             public BlobArray<State> states;
+            
             // According to this post: https://discussions.unity.com/t/transition-to-sub-state-machine-from-any-state/605174/5
             // the Any State in each sub-state machine refers to the exact same global any state, rather than any kind of hierarcy.
             // If for whatever reason we wanted to change this, we could have a transition array for each sub-state machine along
@@ -236,6 +237,7 @@ namespace Latios.MecanimV2
             // Without this flattening, we run into issues with our transition data being spread across two different transition instances.
             // The exit transition (or transition into a sub-state machine) contains the blending info and interrupts, while the entry
             // transition contains the target state.
+            
             public BlobArray<Transition>          initializationEntryStateTransitions;
             public BlobArray<int>                 stateNameHashes;
             public BlobArray<int>                 stateNameEditorHashes;
