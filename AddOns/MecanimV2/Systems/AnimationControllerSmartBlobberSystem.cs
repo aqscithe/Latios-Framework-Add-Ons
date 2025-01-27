@@ -7,9 +7,10 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Entities.LowLevel.Unsafe;
+using Unity.Mathematics;
+using Unity.VisualScripting.Antlr3.Runtime.Tree;
 using UnityEditor.Animations;
 using UnityEngine;
-
 
 namespace Latios.MecanimV2.Authoring.Systems
 {
@@ -60,35 +61,35 @@ namespace Latios.MecanimV2.Authoring.Systems
         private void BakeAnimatorCondition(ref MecanimControllerBlob.Condition blobAnimatorCondition, AnimatorCondition condition,
                                            AnimatorControllerParameter[] parameters)
         {
-            blobAnimatorCondition.mode      = (MecanimControllerBlob.Condition.ConditionType) condition.mode;
+            blobAnimatorCondition.mode = (MecanimControllerBlob.Condition.ConditionType)condition.mode;
 
             parameters.TryGetParameter(condition.parameter, out short conditionParameterIndex);
             blobAnimatorCondition.parameterIndex = conditionParameterIndex;
-            blobAnimatorCondition.compareValue = new MecanimParameter { floatParam = condition.threshold };
+            blobAnimatorCondition.compareValue   = new MecanimParameter { floatParam = condition.threshold };
         }
 
         private void BakeAnimatorStateTransition(ref BlobBuilder builder,
-            ref MecanimControllerBlob.Transition blobTransition,
-            AnimatorTransitionBase transition,
-            int destinationStateIndex, 
-            AnimatorControllerParameter[] parameters)
+                                                 ref MecanimControllerBlob.Transition blobTransition,
+                                                 AnimatorTransitionBase transition,
+                                                 int destinationStateIndex,
+                                                 AnimatorControllerParameter[]        parameters)
         {
             blobTransition.destinationStateIndex = (short) destinationStateIndex;
-            
+
             if (transition is AnimatorStateTransition animatorStateTransition)
             {
-                blobTransition.hasExitTime = animatorStateTransition.hasExitTime;
-                blobTransition.normalizedExitTime = animatorStateTransition.exitTime / animatorStateTransition.duration;
-                blobTransition.normalizedOffset = animatorStateTransition.offset / animatorStateTransition.duration;
-                blobTransition.duration = animatorStateTransition.duration;
-                blobTransition.interruptionSource = (MecanimControllerBlob.Transition.InterruptionSource) animatorStateTransition.interruptionSource;
+                blobTransition.hasExitTime              = animatorStateTransition.hasExitTime;
+                blobTransition.normalizedExitTime       = animatorStateTransition.exitTime / animatorStateTransition.duration;
+                blobTransition.normalizedOffset         = animatorStateTransition.offset / animatorStateTransition.duration;
+                blobTransition.duration                 = animatorStateTransition.duration;
+                blobTransition.interruptionSource       = (MecanimControllerBlob.Transition.InterruptionSource)animatorStateTransition.interruptionSource;
                 blobTransition.usesOrderedInterruptions = animatorStateTransition.orderedInterruption;
             }
 
             // Bake conditions
             BlobBuilderArray<MecanimControllerBlob.Condition> conditionsBuilder =
                 builder.Allocate(ref blobTransition.conditions, transition.conditions.Length);
-            
+
             for (int i = 0; i < transition.conditions.Length; i++)
             {
                 BakeAnimatorCondition(ref conditionsBuilder[i], transition.conditions[i], parameters);
@@ -98,13 +99,13 @@ namespace Latios.MecanimV2.Authoring.Systems
         private static int FindDestinationStateIndexForTransition(AnimatorTransitionBase transition, List<StateInfo> states)
         {
             AnimatorState transitionDestinationState = transition.destinationState;
-            
+
             // If it doesn't have a destination state, it's pointing to a state machine and we can get its default state
             if (transition.destinationState == null)
             {
                 transitionDestinationState = transition.destinationStateMachine.defaultState;
             }
-            
+
             var destinationStateIndex = -1;
             for (int i = 0; i < states.Count; i++)
             {
@@ -117,7 +118,7 @@ namespace Latios.MecanimV2.Authoring.Systems
 
             return destinationStateIndex;
         }
-        
+
         private static int FindStateIndexForState(AnimatorState state, List<StateInfo> states)
         {
             var destinationStateIndex = -1;
@@ -132,23 +133,22 @@ namespace Latios.MecanimV2.Authoring.Systems
             return destinationStateIndex;
         }
 
-
         private void BakeState(
             ref MecanimControllerBlob.State blobState,
             short stateIndexInStateMachine,
             AnimatorState state,
-            AnimatorControllerParameter[] parameters)
+            AnimatorControllerParameter[]   parameters)
         {
-            blobState.baseStateSpeed                = state.speed;
-            blobState.motionCycleOffset             = state.cycleOffset;
-            
-            blobState.useMirror                     = state.mirror;
-            blobState.useFootIK                     = state.iKOnFeet;
+            blobState.baseStateSpeed    = state.speed;
+            blobState.motionCycleOffset = state.cycleOffset;
+
+            blobState.useMirror = state.mirror;
+            blobState.useFootIK = state.iKOnFeet;
 
             blobState.stateSpeedMultiplierParameterIndex = -1;
 
             blobState.stateIndexInStateMachine = stateIndexInStateMachine;
-            
+
             if (state.speedParameterActive)
             {
                 for (int i = 0; i < parameters.Length; i++)
@@ -200,11 +200,11 @@ namespace Latios.MecanimV2.Authoring.Systems
                 }
             }
         }
-        
+
         private MecanimControllerBlob.StateMachine BakeStateMachine(ref BlobBuilder builder,
-                                                                       ref MecanimControllerBlob.StateMachine stateMachineBlob,
-                                                                       AnimatorControllerLayer layer,
-                                                                       AnimatorControllerParameter[]  parameters)
+                                                                    ref MecanimControllerBlob.StateMachine stateMachineBlob,
+                                                                    AnimatorControllerLayer layer,
+                                                                    AnimatorControllerParameter[]          parameters)
         {
             // Gather all states in the state machine (including nested state machines)
             List<StateInfo> stateInfos = new List<StateInfo>();
@@ -213,7 +213,7 @@ namespace Latios.MecanimV2.Authoring.Systems
             //States
             BlobBuilderArray<MecanimControllerBlob.State> statesBuilder =
                 builder.Allocate(ref stateMachineBlob.states, stateInfos.Count);
-            
+
             BlobBuilderArray<int> stateNameHashesBuilder =
                 builder.Allocate(ref stateMachineBlob.stateNameHashes, stateInfos.Count);
             BlobBuilderArray<int> stateNameEditorHashesBuilder =
@@ -222,46 +222,45 @@ namespace Latios.MecanimV2.Authoring.Systems
                 builder.Allocate(ref stateMachineBlob.stateNames, stateInfos.Count);
             BlobBuilderArray<FixedString128Bytes> stateTagsBuilder =
                 builder.Allocate(ref stateMachineBlob.stateTags, stateInfos.Count);
-            
+
             for (short i = 0; i < stateInfos.Count; i++)
             {
                 BakeState(ref statesBuilder[i], i, stateInfos[i].animationState, parameters);
 
-                stateNameHashesBuilder[i] = stateInfos[i].fullPathName.GetHashCode();
+                stateNameHashesBuilder[i]       = stateInfos[i].fullPathName.GetHashCode();
                 stateNameEditorHashesBuilder[i] = stateInfos[i].fullPathName.GetHashCode();
-                stateNamesBuilder[i] = stateInfos[i].fullPathName;
-                stateTagsBuilder[i] = stateInfos[i].animationState.tag;
+                stateNamesBuilder[i]            = stateInfos[i].fullPathName;
+                stateTagsBuilder[i]             = stateInfos[i].animationState.tag;
             }
-            
+
             // TODO: bake all transitions (collapsing exits and entries and logging permutations as needed)
-            
-            
+
             // Entry state transitions
-            short defaultStateIndex = (short)FindStateIndexForState(layer.stateMachine.defaultState, stateInfos);
+            short defaultStateIndex       = (short)FindStateIndexForState(layer.stateMachine.defaultState, stateInfos);
             BlobBuilderArray<MecanimControllerBlob.Transition> entryTransitionsBuilder =
-                builder.Allocate(ref stateMachineBlob.initializationEntryStateTransitions, layer.stateMachine.entryTransitions.Length + 1); // we allocate one more for the default in position 0
+                builder.Allocate(ref stateMachineBlob.initializationEntryStateTransitions, layer.stateMachine.entryTransitions.Length + 1);  // we allocate one more for the default in position 0
 
             // Add a dummy transition to the default state in position 0 of the array
             entryTransitionsBuilder[0].destinationStateIndex = defaultStateIndex;
-            
+
             for (int i = 0; i < layer.stateMachine.entryTransitions.Length; i++)
             {
                 AnimatorTransition stateMachineEntryTransition = layer.stateMachine.entryTransitions[i];
-                
+
                 int stateDestinationIndex = FindDestinationStateIndexForTransition(stateMachineEntryTransition, stateInfos);
                 Debug.Log(stateDestinationIndex);
-                
+
                 // Default state dummy transition is in index 0. We add the rest of the entry transitions after that one.
-                BakeAnimatorStateTransition(ref builder, ref entryTransitionsBuilder[i+1], stateMachineEntryTransition, stateDestinationIndex, parameters);
+                BakeAnimatorStateTransition(ref builder, ref entryTransitionsBuilder[i + 1], stateMachineEntryTransition, stateDestinationIndex, parameters);
             }
-            
+
             // Any state transitions
             BlobBuilderArray<MecanimControllerBlob.Transition> anyStateTransitionsBuilder =
                 builder.Allocate(ref stateMachineBlob.anyStateTransitions, layer.stateMachine.anyStateTransitions.Length);
             for (int i = 0; i < layer.stateMachine.anyStateTransitions.Length; i++)
             {
                 int stateDestinationIndex = FindDestinationStateIndexForTransition(layer.stateMachine.anyStateTransitions[i], stateInfos);
-                
+
                 BakeAnimatorStateTransition(ref builder, ref anyStateTransitionsBuilder[i], layer.stateMachine.anyStateTransitions[i], stateDestinationIndex, parameters);
             }
 
@@ -276,27 +275,28 @@ namespace Latios.MecanimV2.Authoring.Systems
                 states.Add(new StateInfo
                 {
                     animationState = childState.state,
-                    fullPathName = prefix + childState.state.name, 
+                    fullPathName   = prefix + childState.state.name,
                 });
             }
-            
+
             // Process sub state machines recursively
-            if (stateMachine.stateMachines.Length == 0) return;
-            
+            if (stateMachine.stateMachines.Length == 0)
+                return;
+
             foreach (var childStateMachine in stateMachine.stateMachines)
             {
                 string prefixForChildStateMachine = prefix + childStateMachine.stateMachine.name + ".";
                 CollectStateInfosRecursivelyForStateMachine(ref states, childStateMachine.stateMachine, prefixForChildStateMachine);
             }
         }
-        
+
         private MecanimControllerBlob.Layer BakeLayer(ref BlobBuilder builder,
-            ref MecanimControllerBlob.Layer layerBlob,
-            AnimatorControllerLayer layer,
-            short stateMachineIndex,
-            short boneMaskIndex,
-            UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipsIndicesHashMap,
-            UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap)
+                                                      ref MecanimControllerBlob.Layer layerBlob,
+                                                      AnimatorControllerLayer layer,
+                                                      short stateMachineIndex,
+                                                      short boneMaskIndex,
+                                                      UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipsIndicesHashMap,
+                                                      UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap)
         {
             layerBlob.name                        = layer.name;
             layerBlob.originalLayerWeight         = layer.defaultWeight;
@@ -304,12 +304,12 @@ namespace Latios.MecanimV2.Authoring.Systems
             layerBlob.useAdditiveBlending         = layer.blendingMode == AnimatorLayerBlendingMode.Additive;
             layerBlob.syncLayerUsesBlendedTimings = layer.syncedLayerAffectsTiming;
 
-            layerBlob.stateMachineIndex           = stateMachineIndex;
-            layerBlob.isSyncLayer                 = layer.syncedLayerIndex != -1;
-            layerBlob.syncLayerIndex              = (short) layer.syncedLayerIndex;
+            layerBlob.stateMachineIndex = stateMachineIndex;
+            layerBlob.isSyncLayer       = layer.syncedLayerIndex != -1;
+            layerBlob.syncLayerIndex    = (short) layer.syncedLayerIndex;
 
             layerBlob.boneMaskIndex = boneMaskIndex;
-            
+
             // Gather all states in the state machine (including nested state machines)
             List<StateInfo> stateInfos = new List<StateInfo>();
             CollectStateInfosRecursivelyForStateMachine(ref stateInfos, layer.stateMachine);
@@ -320,13 +320,13 @@ namespace Latios.MecanimV2.Authoring.Systems
             for (var index = 0; index < stateInfos.Count; index++)
             {
                 Motion stateMotion = stateInfos[index].animationState.motion;
-                
+
                 if (stateMotion is BlendTree blendTree)
                 {
                     motionIndicesArrayBuilder[index] = new MecanimControllerBlob.MotionIndex
                     {
                         isBlendTree = true,
-                        index = (ushort) blendTreeIndicesHashMap[blendTree],
+                        index       = (ushort) blendTreeIndicesHashMap[blendTree],
                     };
                 }
                 else if (stateMotion is AnimationClip animationClip)
@@ -334,7 +334,7 @@ namespace Latios.MecanimV2.Authoring.Systems
                     motionIndicesArrayBuilder[index] = new MecanimControllerBlob.MotionIndex
                     {
                         isBlendTree = false,
-                        index = (ushort) animationClipsIndicesHashMap[animationClip],
+                        index       = (ushort) animationClipsIndicesHashMap[animationClip],
                     };
                 }
                 else
@@ -342,29 +342,29 @@ namespace Latios.MecanimV2.Authoring.Systems
                     motionIndicesArrayBuilder[index] = MecanimControllerBlob.MotionIndex.Invalid;
                 }
             }
-            
+
             return layerBlob;
         }
-        
+
         private BlobAssetReference<MecanimControllerBlob> BakeAnimatorController(AnimatorController animatorController)
         {
-            var builder                    = new BlobBuilder(Allocator.Temp);
+            var builder                = new BlobBuilder(Allocator.Temp);
             ref var blobAnimatorController = ref builder.ConstructRoot<MecanimControllerBlob>();
-            blobAnimatorController.name    = animatorController.name;
+            blobAnimatorController.name = animatorController.name;
 
             UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap = new UnsafeHashMap<UnityObjectRef<AnimationClip>, int>(1, Allocator.Temp);
             BuildClipMotionIndicesHashes(animatorController, ref animationClipIndicesHashMap);
 
             UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap = new UnsafeHashMap<UnityObjectRef<BlendTree>, int>(1, Allocator.Temp);
             BakeBlendTrees(ref builder, ref blobAnimatorController, animatorController, ref blendTreeIndicesHashMap, in animationClipIndicesHashMap);
-            
+
             BlobBuilderArray<MecanimControllerBlob.StateMachine> stateMachinesBuilder =
                 builder.Allocate(ref blobAnimatorController.stateMachines, GetStateMachinesCount(animatorController.layers));
             BlobBuilderArray<MecanimControllerBlob.Layer> layersBuilder =
                 builder.Allocate(ref blobAnimatorController.layers, animatorController.layers.Length);
-            
+
             NativeHashMap<short, short> owningLayerToStateMachine = new NativeHashMap<short, short>(1, Allocator.Temp);
-            
+
             builder = BakeStateMachines(animatorController, ref owningLayerToStateMachine, ref stateMachinesBuilder, ref builder);
 
             builder = BakeLayers(animatorController, ref animationClipIndicesHashMap, ref blendTreeIndicesHashMap, ref owningLayerToStateMachine, ref layersBuilder, ref builder);
@@ -384,8 +384,12 @@ namespace Latios.MecanimV2.Authoring.Systems
                 animationClipIndicesHashMap.TryAdd(clip, animationClipIndicesHashMap.Count);
             }
         }
-        
-        private void BakeBlendTrees(ref BlobBuilder builder, ref MecanimControllerBlob blobAnimatorController, AnimatorController animatorController, ref UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap, in UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap)
+
+        private void BakeBlendTrees(ref BlobBuilder builder,
+                                    ref MecanimControllerBlob blobAnimatorController,
+                                    AnimatorController animatorController,
+                                    ref UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap,
+                                    in UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap)
         {
             // Save BlendTrees and their indices for all blend trees for easy lookups while baking layers and blend trees
             foreach (var layer in animatorController.layers)
@@ -401,24 +405,31 @@ namespace Latios.MecanimV2.Authoring.Systems
                 }
             }
 
-            BlobBuilderArray<MecanimControllerBlob.BlendTree> blendTreesBuilder = builder.Allocate(ref blobAnimatorController.blendTrees, blendTreeIndicesHashMap.Count);
-            
+            BlobBuilderArray<MecanimControllerBlob.BlendTree> blendTreesBuilder = builder.Allocate(ref blobAnimatorController.blendTrees,
+                                                                                                   blendTreeIndicesHashMap.Count);
+
             // Now bake all the blend trees using the populated blend tree hashmap
             foreach (var keyPair in blendTreeIndicesHashMap)
             {
-                BlendTree blendTree = keyPair.Key;
+                BlendTree blendTree      = keyPair.Key;
                 int blendTreeIndex = keyPair.Value;
-                
+
                 BakeBlendTree(animatorController, blendTree, blendTreeIndex, ref builder, ref blendTreesBuilder, in blendTreeIndicesHashMap, in animationClipIndicesHashMap);
             }
         }
 
-        private void BakeBlendTree(AnimatorController animatorController, BlendTree blendTree, int blendTreeIndex, ref BlobBuilder builder, ref BlobBuilderArray<MecanimControllerBlob.BlendTree> blendTreesBuilder, in UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap, in UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap)
+        private void BakeBlendTree(AnimatorController animatorController,
+                                   BlendTree blendTree,
+                                   int blendTreeIndex,
+                                   ref BlobBuilder builder,
+                                   ref BlobBuilderArray<MecanimControllerBlob.BlendTree> blendTreesBuilder,
+                                   in UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap,
+                                   in UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap)
         {
             ref MecanimControllerBlob.BlendTree blendTreeBlob = ref blendTreesBuilder[blendTreeIndex];
-            
+
             blendTreeBlob.blendTreeType = MecanimControllerBlob.BlendTree.FromUnityBlendTreeType(blendTree.blendType);
-            
+
             // Bake blend tree parameters
             NativeList<short> parameterIndices = new NativeList<short>(1, Allocator.Temp);
             if (blendTreeBlob.blendTreeType == MecanimControllerBlob.BlendTree.BlendTreeType.Simple1D)
@@ -433,19 +444,19 @@ namespace Latios.MecanimV2.Authoring.Systems
                 animatorController.parameters.TryGetParameter(blendTree.blendParameterY, out short conditionParameterIndexY);
                 parameterIndices.Add(conditionParameterIndexY);
             }
-            
+
             var childrenBuilder = builder.Allocate(ref blendTreeBlob.children, blendTree.children.Length);
 
             for (var childIndex = 0; childIndex < blendTree.children.Length; childIndex++)
             {
                 var childMotion = blendTree.children[childIndex];
-                MecanimControllerBlob.BlendTree.Child childBlob = childrenBuilder[childIndex];
+                MecanimControllerBlob.BlendTree.Child childBlob   = childrenBuilder[childIndex];
 
                 childBlob.cycleOffset = childMotion.cycleOffset;
-                childBlob.mirrored = childMotion.mirror;
-                childBlob.position = childMotion.position;
-                childBlob.timeScale = childMotion.timeScale;
-                childBlob.threshold = childMotion.threshold;
+                childBlob.mirrored    = childMotion.mirror;
+                childBlob.position    = childMotion.position;
+                childBlob.timeScale   = childMotion.timeScale;
+                childBlob.threshold   = childMotion.threshold;
 
                 // TODO: childBlob.isLooping  // This doesn't seem to be available in childMotion data
 
@@ -455,7 +466,7 @@ namespace Latios.MecanimV2.Authoring.Systems
                     animatorController.parameters.TryGetParameter(childMotion.directBlendParameter, out short childParameterIndex);
                     parameterIndices.Add(childParameterIndex);
                 }
-                
+
                 // Set child motion indices for a blend tree or an animation clip
                 if (childMotion.motion is BlendTree childBlendTree)
                 {
@@ -463,7 +474,7 @@ namespace Latios.MecanimV2.Authoring.Systems
                     childBlob.motionIndex = new MecanimControllerBlob.MotionIndex
                     {
                         isBlendTree = true,
-                        index = (ushort)blendTreeIndicesHashMap[childBlendTree],
+                        index       = (ushort)blendTreeIndicesHashMap[childBlendTree],
                     };
                 }
                 else if (childMotion.motion is AnimationClip childAnimationClip)
@@ -472,11 +483,46 @@ namespace Latios.MecanimV2.Authoring.Systems
                     childBlob.motionIndex = new MecanimControllerBlob.MotionIndex
                     {
                         isBlendTree = false,
-                        index = (ushort)animationClipIndicesHashMap[childAnimationClip],
+                        index       = (ushort)animationClipIndicesHashMap[childAnimationClip],
                     };
                 }
 
                 childrenBuilder[childIndex] = childBlob;
+            }
+
+            if (blendTreeBlob.blendTreeType == MecanimControllerBlob.BlendTree.BlendTreeType.FreeformDirectional2D ||
+                blendTreeBlob.blendTreeType == MecanimControllerBlob.BlendTree.BlendTreeType.FreeformCartesian2D)
+            {
+                // See https://runevision.com/thesis/rune_skovbo_johansen_thesis.pdf at 6.3 (p58) for details.
+                // Because atan2 is expensive at runtime for FreeformDirectional2D, and we need to do it with O(n^2) complexity,
+                // we precompute the results in the blob.
+                var pipjBuilder = builder.Allocate(ref blendTreeBlob.pipjs, (childrenBuilder.Length - 1) * (childrenBuilder.Length - 1));
+                var childCount  = childrenBuilder.Length;
+                for (int i = 0; i < childCount; i++)
+                {
+                    var pi    = childrenBuilder[i].position;
+                    var pimag = math.length(pi);
+
+                    for (int j = i + 1; j < childCount; j++)
+                    {
+                        var pj   = childrenBuilder[j].position;
+                        float3 pipj = default;
+                        if (blendTreeBlob.blendTreeType == MecanimControllerBlob.BlendTree.BlendTreeType.FreeformDirectional2D)
+                        {
+                            var pjmag = math.length(pj);
+                            pipj.x = (pimag - pjmag) / (0.5f * (pimag + pjmag));
+                            var direction = LatiosMath.ComplexMul(pi, new float2(pj.x, -pj.y));
+                            pipj.y = MecanimControllerBlob.BlendTree.kFreeformDirectionalBias * math.atan2(direction.y, direction.x);
+                        }
+                        else
+                        {
+                            pipj.xy = pj - pi;
+                        }
+                        pipj.z                                                                   = 1f / math.lengthsq(pipj.xy);
+                        pipjBuilder[MecanimControllerBlob.BlendTree.PipjIndex(i, j, childCount)] = pipj;
+                        pipjBuilder[MecanimControllerBlob.BlendTree.PipjIndex(j, i, childCount)] = pipj * new float3(-1f, -1f, 1f);
+                    }
+                }
             }
 
             builder.ConstructFromNativeArray(ref blendTreeBlob.parameterIndices, parameterIndices.ToArray(Allocator.Temp));
@@ -485,8 +531,9 @@ namespace Latios.MecanimV2.Authoring.Systems
         private void AddBlendTreesToIndicesHashMapRecursively(BlendTree blendTree, ref UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap)
         {
             // If we already have this blend tree in our hashmap, we don't need to process it again
-            if (!blendTreeIndicesHashMap.TryAdd(blendTree, blendTreeIndicesHashMap.Count)) return;
-            
+            if (!blendTreeIndicesHashMap.TryAdd(blendTree, blendTreeIndicesHashMap.Count))
+                return;
+
             foreach (var blendTreeChild in blendTree.children)
             {
                 if (blendTreeChild.motion is BlendTree childBlendTree)
@@ -497,11 +544,11 @@ namespace Latios.MecanimV2.Authoring.Systems
         }
 
         private BlobBuilder BakeLayers(AnimatorController animatorController,
-            ref UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap,
-            ref UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap,
-            ref NativeHashMap<short, short> owningLayerToStateMachine,
-            ref BlobBuilderArray<MecanimControllerBlob.Layer> layersBuilder,
-            ref BlobBuilder builder)
+                                       ref UnsafeHashMap<UnityObjectRef<AnimationClip>, int> animationClipIndicesHashMap,
+                                       ref UnsafeHashMap<UnityObjectRef<BlendTree>, int> blendTreeIndicesHashMap,
+                                       ref NativeHashMap<short, short> owningLayerToStateMachine,
+                                       ref BlobBuilderArray<MecanimControllerBlob.Layer> layersBuilder,
+                                       ref BlobBuilder builder)
         {
             short boneMasksFound = 0;
             for (short i = 0; i < animatorController.layers.Length; i++)
@@ -517,7 +564,7 @@ namespace Latios.MecanimV2.Authoring.Systems
                     boneMaskIndex = boneMasksFound;
                     boneMasksFound++;
                 }
-                
+
                 BakeLayer(ref builder, ref layersBuilder[i], layer, stateMachineIndex, boneMaskIndex, animationClipIndicesHashMap, blendTreeIndicesHashMap);
             }
 
@@ -537,7 +584,7 @@ namespace Latios.MecanimV2.Authoring.Systems
 
             return stateMachinesCount;
         }
-        
+
         private BlobBuilder BakeStateMachines(
             AnimatorController animatorController,
             ref NativeHashMap<short, short> owningLayerToStateMachine,
@@ -545,7 +592,7 @@ namespace Latios.MecanimV2.Authoring.Systems
             ref BlobBuilder builder)
         {
             NativeParallelMultiHashMap<short, short> layersInfluencingTimingsByAffectedLayer = new NativeParallelMultiHashMap<short, short>(1, Allocator.Temp);
-            
+
             short stateMachinesAdded = 0;
             for (short i = 0; i < animatorController.layers.Length; i++)
             {
@@ -555,20 +602,21 @@ namespace Latios.MecanimV2.Authoring.Systems
                 {
                     // Not a synced layer, add new state machine
                     BakeStateMachine(ref builder, ref stateMachinesBuilder[stateMachinesAdded], layer, animatorController.parameters);
-                    
+
                     // Associate the index of this layer with its state machine index for easier lookups
                     owningLayerToStateMachine.Add(i, stateMachinesAdded);
-                    
+
                     stateMachinesAdded++;
-                } else if (layer.syncedLayerAffectsTiming)
+                }
+                else if (layer.syncedLayerAffectsTiming)
                 {
                     // This is a synced layer that affects timings. Save it as an influencing layer for the layer it's syncing with.
                     layersInfluencingTimingsByAffectedLayer.Add((short) layer.syncedLayerIndex, i);
                 }
             }
-            
+
             PopulateLayersAffectingStateMachinesTimings(animatorController, owningLayerToStateMachine, ref stateMachinesBuilder, builder, layersInfluencingTimingsByAffectedLayer);
-            
+
             return builder;
         }
 
@@ -582,10 +630,12 @@ namespace Latios.MecanimV2.Authoring.Systems
             // Populate list of layers that affects each state machine timings.
             for (short i = 0; i < animatorController.layers.Length; i++)
             {
-                if (!owningLayerToStateMachine.ContainsKey(i)) continue;
+                if (!owningLayerToStateMachine.ContainsKey(i))
+                    continue;
 
                 int influencingLayersCount = layersInfluencingTimingsByAffectedLayer.CountValuesForKey(i);
-                if (influencingLayersCount == 0) continue;
+                if (influencingLayersCount == 0)
+                    continue;
 
                 // Get associated state machine blob
                 ref var stateMachineBlob = ref stateMachinesBuilder[owningLayerToStateMachine[i]];
@@ -600,7 +650,8 @@ namespace Latios.MecanimV2.Authoring.Systems
                     {
                         influencingLayersBuilder[indexInArrayOfInfluencingLayers] = influencingLayer;
                         indexInArrayOfInfluencingLayers++;
-                    } while (layersInfluencingTimingsByAffectedLayer.TryGetNextValue(out influencingLayer, ref it));
+                    }
+                    while (layersInfluencingTimingsByAffectedLayer.TryGetNextValue(out influencingLayer, ref it));
                 }
 
                 stateMachinesBuilder[owningLayerToStateMachine[i]] = stateMachineBlob;
@@ -610,17 +661,17 @@ namespace Latios.MecanimV2.Authoring.Systems
         private static void BakeParameters(AnimatorController animatorController, ref BlobBuilder builder, ref MecanimControllerBlob blobAnimatorController)
         {
             var parametersCount = animatorController.parameters.Length;
-            
+
             blobAnimatorController.parameterTypes = new MecanimControllerBlob.ParameterTypes();
-            BlobBuilderArray<int> packedTypes = 
+            BlobBuilderArray<int> packedTypes =
                 builder.Allocate(
-                    ref blobAnimatorController.parameterTypes.packedTypes, 
+                    ref blobAnimatorController.parameterTypes.packedTypes,
                     MecanimControllerBlob.ParameterTypes.PackedTypesArrayLength(parametersCount));
 
-            BlobBuilderArray<int> parameterNameHashes = builder.Allocate(ref blobAnimatorController.parameterNameHashes, parametersCount);
-            BlobBuilderArray<int> parameterEditorNameHashes = builder.Allocate(ref blobAnimatorController.parameterEditorNameHashes, parametersCount);
-            BlobBuilderArray<FixedString64Bytes> parameterNames = builder.Allocate(ref blobAnimatorController.parameterNames, parametersCount);
-            
+            BlobBuilderArray<int>                parameterNameHashes       = builder.Allocate(ref blobAnimatorController.parameterNameHashes, parametersCount);
+            BlobBuilderArray<int>                parameterEditorNameHashes = builder.Allocate(ref blobAnimatorController.parameterEditorNameHashes, parametersCount);
+            BlobBuilderArray<FixedString64Bytes> parameterNames            = builder.Allocate(ref blobAnimatorController.parameterNames, parametersCount);
+
             // Bake parameter types names and hashes
             for (int i = 0; i < parametersCount; i++)
             {
@@ -629,10 +680,10 @@ namespace Latios.MecanimV2.Authoring.Systems
                 int nameHash = parameter.name.GetHashCode();
 
                 MecanimControllerBlob.ParameterTypes.PackTypeIntoBlobBuilder(ref packedTypes, i, parameter.type);
-                
-                parameterNameHashes[i] = nameHash;
+
+                parameterNameHashes[i]       = nameHash;
                 parameterEditorNameHashes[i] = nameHash;
-                parameterNames[i] = parameter.name;
+                parameterNames[i]            = parameter.name;
             }
         }
 
@@ -644,3 +695,4 @@ namespace Latios.MecanimV2.Authoring.Systems
     }
 }
 #endif
+

@@ -12,8 +12,8 @@ namespace Latios.MecanimV2
         public BlobArray<int>                parameterEditorNameHashes;  // Todo: Is it possible to match this to name hashes so we can omit this?
         public BlobArray<FixedString64Bytes> parameterNames;
 
-        public BlobArray<Layer>              layers;
-        public BlobArray<StateMachine>       stateMachines;
+        public BlobArray<Layer>        layers;
+        public BlobArray<StateMachine> stateMachines;
 
         public BlobArray<BlendTree> blendTrees;
 
@@ -23,7 +23,7 @@ namespace Latios.MecanimV2
         {
             public BlobArray<int> packedTypes;
             public Type this[int index] => (Type) Bits.GetBits(packedTypes[index >> 4], (index & 0xf) << 1, 2);
-            
+
             public enum Type : byte
             {
                 Float = 0,
@@ -31,19 +31,19 @@ namespace Latios.MecanimV2
                 Bool = 2,
                 Trigger = 3,
             }
-            
+
             // Calculates the number of ints needed in the packedTypes blob array to represent all the parameter types
             public static int PackedTypesArrayLength(int parametersCount)
             {
                 return (parametersCount + 15) >> 4;
             }
-            
+
             // Packs a UnityEngine.AnimatorControllerParameterType as 2 bits in the right position of a packedTypes blob array builder
             public static void PackTypeIntoBlobBuilder(ref BlobBuilderArray<int> packedTypesBlobBuilderArray, int parameterIndex, AnimatorControllerParameterType parameterType)
             {
                 Bits.SetBits(ref packedTypesBlobBuilderArray[parameterIndex >> 4], (parameterIndex & 0xf) << 1, 2, (byte) FromAnimatorParameterType(parameterType));
             }
-            
+
             // Maps Unity animator parameter types to our ParameterTypes.Type enum values.
             public static Type FromAnimatorParameterType(AnimatorControllerParameterType unityType) {
                 switch (unityType)
@@ -61,7 +61,7 @@ namespace Latios.MecanimV2
         public struct MotionIndex
         {
             private const ushort InvalidIndex = 0x7fff;
-            
+
             private ushort packed;
             public ushort index  // Either blend tree array index or index into Skeleton/ParameterClipSetBlob
             {
@@ -74,17 +74,17 @@ namespace Latios.MecanimV2
                 set => Bits.SetBit(ref packed, 15, value);
             }
             public bool invalid => index == InvalidIndex;
-            
+
             public static MotionIndex Invalid = new MotionIndex
             {
                 isBlendTree = false,
-                index = InvalidIndex,
+                index       = InvalidIndex,
             };
         }
 
         public struct Layer
         {
-            public float originalLayerWeight; // TODO: should this just be called weight and represent the weight of the current layer now?
+            public float originalLayerWeight;  // TODO: should this just be called weight and represent the weight of the current layer now?
             public short syncLayerIndex;  // The index of the layer we are syncing with (-1 when this is not a sync layer)
             public short stateMachineIndex;  // The state machine index this layer uses
             public short boneMaskIndex;  // Index in BoneMaskSetBlob
@@ -198,7 +198,7 @@ namespace Latios.MecanimV2
             public short motionCycleOffsetParameterIndex;
             public short mirrorParameterIndex;
             public short motionTimeOverrideParameterIndex;
-            
+
             // Index of this state in the layers that use it, to access its motion,
             // we can use layer.motionIndices[state.stateIndexInLayer]
             public short stateIndexInStateMachine;
@@ -223,7 +223,7 @@ namespace Latios.MecanimV2
             public BlobArray<short> influencingSyncLayers;
             // Note: We flatten out sub-state machines.
             public BlobArray<State> states;
-            
+
             // According to this post: https://discussions.unity.com/t/transition-to-sub-state-machine-from-any-state/605174/5
             // the Any State in each sub-state machine refers to the exact same global any state, rather than any kind of hierarcy.
             // If for whatever reason we wanted to change this, we could have a transition array for each sub-state machine along
@@ -237,7 +237,7 @@ namespace Latios.MecanimV2
             // Without this flattening, we run into issues with our transition data being spread across two different transition instances.
             // The exit transition (or transition into a sub-state machine) contains the blending info and interrupts, while the entry
             // transition contains the target state.
-            
+
             public BlobArray<Transition>          initializationEntryStateTransitions;
             public BlobArray<int>                 stateNameHashes;
             public BlobArray<int>                 stateNameEditorHashes;
@@ -250,6 +250,8 @@ namespace Latios.MecanimV2
             public BlendTreeType    blendTreeType;
             public BlobArray<Child> children;
             public BlobArray<short> parameterIndices;
+            // Sized by (childCount - 1)^2, z is 1 / lengthSq
+            public BlobArray<float3> pipjs;
 
             public enum BlendTreeType
             {
@@ -279,7 +281,7 @@ namespace Latios.MecanimV2
                     set => Bits.SetBit(ref packedFlags, 1, value);
                 }
             }
-            
+
 #if UNITY_EDITOR
             // Maps Unity animator parameter types to our ParameterTypes.Type enum values.
             internal static BlendTreeType FromUnityBlendTreeType(UnityEditor.Animations.BlendTreeType unityBlendTreeType) {
@@ -295,6 +297,13 @@ namespace Latios.MecanimV2
                     $"Encountered unknown blend tree type {unityBlendTreeType}. If you see this, please report a bug to the Latios Framework developers.");
             }
 #endif
+
+            internal static int PipjIndex(int i, int j, int childCount)
+            {
+                return (childCount - 1) * i + math.select(j, j - 1, j > i);
+            }
+
+            internal const float kFreeformDirectionalBias = 2f;
         }
     }
 }
