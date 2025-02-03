@@ -641,7 +641,7 @@ namespace Latios.MecanimV2.Authoring.Systems
                 ref var stateMachineBlob = ref stateMachinesBuilder[owningLayerToStateMachine[i]];
 
                 // initialize the blob array for layers affecting timings on the state machine blob
-                BlobBuilderArray<short> influencingLayersBuilder = builder.Allocate(ref stateMachineBlob.influencingSyncLayers, influencingLayersCount);
+                BlobBuilderArray<short> influencingLayersBuilder = builder.Allocate(ref stateMachineBlob.influencingLayers, influencingLayersCount);
 
                 var indexInArrayOfInfluencingLayers = 0;
                 if (layersInfluencingTimingsByAffectedLayer.TryGetFirstValue(i, out short influencingLayer, out NativeParallelMultiHashMapIterator<short> it))

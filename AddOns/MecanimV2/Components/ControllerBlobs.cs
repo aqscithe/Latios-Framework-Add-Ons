@@ -177,6 +177,8 @@ namespace Latios.MecanimV2
                 set => Bits.SetBit(ref packed, 15, value);
             }
             public bool invalid => index == 0x7fff;
+
+            public static TransitionIndex Null => new TransitionIndex { packed = 0x7fff };
         }
 
         public struct State
@@ -219,8 +221,8 @@ namespace Latios.MecanimV2
 
         public struct StateMachine
         {
-            // These are only sync layers whose weights affect timings.
-            public BlobArray<short> influencingSyncLayers;
+            // These are only the primary state machine layer and sync layers whose weights affect timings.
+            public BlobArray<short> influencingLayers;
             // Note: We flatten out sub-state machines.
             public BlobArray<State> states;
 
