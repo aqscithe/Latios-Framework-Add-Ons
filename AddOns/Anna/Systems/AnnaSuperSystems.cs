@@ -14,6 +14,8 @@ namespace Latios.Anna.Systems
     {
         protected override void CreateSystems()
         {
+            EnableSystemSorting = false;
+
             GetOrCreateAndAddUnmanagedSystem<BuildEnvironmentCollisionLayerSystem>();
             GetOrCreateAndAddUnmanagedSystem<BuildKinematicCollisionLayerSystem>();
             GetOrCreateAndAddUnmanagedSystem<BuildRigidBodyCollisionLayerSystem>();

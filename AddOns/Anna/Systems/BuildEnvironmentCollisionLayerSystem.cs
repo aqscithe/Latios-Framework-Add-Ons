@@ -22,7 +22,7 @@ namespace Latios.Anna.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
             m_handles   = new BuildCollisionLayerTypeHandles(ref state);
-            m_query     = state.Fluent().With<EnvironmentCollisionTag>(true).PatchQueryForBuildingCollisionLayer().Build();
+            m_query     = state.Fluent().With<EnvironmentCollisionTag>(true).Without<RigidBody, KinematicCollisionTag>().PatchQueryForBuildingCollisionLayer().Build();
         }
 
         public void OnNewScene(ref SystemState state)

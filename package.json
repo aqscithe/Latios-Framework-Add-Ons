@@ -1,16 +1,16 @@
 {
   "name": "com.latios.latiosframework.addons",
   "displayName": "Latios Framework Addons",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "unity": "6000.0",
   "description": "A collection of Addons made for the Latios Framework.",
   "unityRelease": "23f1",
   "keywords": [
     "dots",
-	"ecs",
+    "ecs",
     "latios",
     "framework",
-	"addons"
+    "addons"
   ],
   "author": {
     "name": "Dreaming I'm Latios"

@@ -280,8 +280,8 @@ namespace Latios.Anna.Systems
                             UnitySim.BuildJacobian(out streamData.parameters,
                                                    inertialPoseWorldTransform,
                                                    float3.zero,
-                                                   inertialPoseWorldTransform,
                                                    RigidTransform.identity,
+                                                   new RigidTransform(quaternion.identity, inertialPoseWorldTransform.pos),
                                                    0f,
                                                    0f,
                                                    lockTau,
@@ -347,7 +347,7 @@ namespace Latios.Anna.Systems
                                                                                                               bucketIndex,
                                                                                                               false,
                                                                                                               out var pair);
-                                pair.userByte     = SolveByteCodes.rotationConstraint2;
+                                pair.userByte     = SolveByteCodes.rotationConstraint1;
                                 streamData.indexA = index;
                                 streamData.indexB = -1;
                                 UnitySim.BuildJacobian(out streamData.parameters,
