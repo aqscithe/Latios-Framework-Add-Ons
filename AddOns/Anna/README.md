@@ -1,4 +1,4 @@
-# Add-On README Template
+# Anna – Physics Engine
 
 Anna is a simple out-of-the-box rigid body physics engine built on Psyshock’s
 UnitySim APIs. It is intended to be general-purpose, striking a balance between

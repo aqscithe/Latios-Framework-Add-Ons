@@ -1,4 +1,4 @@
-# Add-On README Template
+# Cyline – Line Rendering
 
 Cyline is a 3D line renderer add-on using Kinemation’s Unique Mesh APIs. The
 generated mesh is a tubular or cylindrical shape. The implementation is based on
@@ -11,7 +11,7 @@ the original work created for Game Objects here:
 
 **Requirements:**
 
--   Requires Latios Framework 0.12.0-alpha.6 or newer
+-   Requires Latios Framework 0.12.0 or newer
 
 **Main Author(s):** Dreaming I’m Latios
 
