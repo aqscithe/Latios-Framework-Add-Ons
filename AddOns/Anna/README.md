@@ -31,7 +31,7 @@ requests.
 Add the following to `LatiosBootstrap` (only the runtime is necessary):
 
 ```csharp
-Latios.Psyshock.Anna.AnnaBootstrap.InstallAnna(world);
+Latios.Anna.AnnaBootstrap.InstallAnna(world);
 ```
 
 ### Usage
