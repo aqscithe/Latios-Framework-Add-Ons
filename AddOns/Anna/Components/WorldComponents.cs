@@ -21,7 +21,7 @@ namespace Latios.Anna
     {
         public CollisionLayer layer;
 
-        public JobHandle TryDispose(JobHandle inputDeps) => layer.IsCreated ? layer.Dispose(inputDeps) : inputDeps;
+        public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;  // Uses WorldUpdateAllocator
     }
 
     public struct KinematicCollisionTag : IComponentData { }
@@ -30,7 +30,7 @@ namespace Latios.Anna
     {
         public CollisionLayer layer;
 
-        public JobHandle TryDispose(JobHandle inputDeps) => layer.IsCreated ? layer.Dispose(inputDeps) : inputDeps;
+        public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;  // Uses WorldUpdateAllocator
     }
 }
 

@@ -36,7 +36,7 @@ namespace Latios.Anna.Systems
             m_handles.Update(ref state);
             var physicsSettings = latiosWorld.GetPhysicsSettings();
             state.Dependency    = Physics.BuildCollisionLayer(m_query, in m_handles).WithSettings(physicsSettings.collisionLayerSettings)
-                                  .ScheduleParallel(out var layer, Allocator.Persistent, state.Dependency);
+                                  .ScheduleParallel(out var layer, state.WorldUpdateAllocator, state.Dependency);
             latiosWorld.sceneBlackboardEntity.SetCollectionComponentAndDisposeOld(new EnvironmentCollisionLayer
             {
                 layer = layer
