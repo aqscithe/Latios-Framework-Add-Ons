@@ -358,17 +358,9 @@ namespace Latios.MecanimV2
                                                   bool mirroredParent,
                                                   ref T processor) where T : unmanaged, IProcessor
         {
-            float totalWeight = 0f;
             for (int i = 0; i < tree.children.Length; i++)
             {
-                var weight   = parameters[tree.parameterIndices[i]].floatParam;
-                totalWeight += weight;
-            }
-            float inverseTotalWeight = math.select(1f / totalWeight, 0f, totalWeight <= 0f);
-
-            for (int i = 0; i < tree.children.Length; i++)
-            {
-                var weight = inverseTotalWeight * parameters[tree.parameterIndices[i]].floatParam;
+                var weight = parameters[tree.parameterIndices[i]].floatParam;
 
                 if (weight > 0f)
                 {
@@ -674,12 +666,12 @@ namespace Latios.MecanimV2
                 float2 pip;
                 if (tree.blendTreeType == MecanimControllerBlob.BlendTree.BlendTreeType.FreeformDirectional2D)
                 {
-                    var pmag      = math.length(p);
-                    var pimag     = math.length(pi);
-                    pip.x         = pmag - pimag;
-                    var direction = LatiosMath.ComplexMul(pi, new float2(p.x, -p.y));
+                    var pmag          = math.length(p);
+                    var pimag         = math.length(pi);
+                    pip.x             = pmag - pimag;
+                    var direction     = LatiosMath.ComplexMul(pi, new float2(p.x, -p.y));
                     var directionAtan = math.select(math.atan2(direction.y, direction.x), 0, pi.Equals(float2.zero));
-                    pip.y         = MecanimControllerBlob.BlendTree.kFreeformDirectionalBias * directionAtan;
+                    pip.y             = MecanimControllerBlob.BlendTree.kFreeformDirectionalBias * directionAtan;
                 }
                 else
                 {

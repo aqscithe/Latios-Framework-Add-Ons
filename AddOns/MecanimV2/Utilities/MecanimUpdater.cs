@@ -215,13 +215,13 @@ namespace Latios.MecanimV2
                             var bits = maskPtr[m];
                             for (int i = math.tzcnt(bits); i < 64; bits ^= 1ul << i, i = math.tzcnt(bits))
                             {
-                                int boneIndex = m * 64 + i;
-                                var add          = sampleBuffer[boneIndex];
-                                var position     = add.position * layerWeight;
-                                var rotation     = math.nlerp(quaternion.identity, add.rotation, layerWeight);
-                                var scaleStretch = math.lerp(1f, new float4(add.stretch, add.scale), layerWeight);
-                                add              = new TransformQvvs(position, rotation, scaleStretch.w, scaleStretch.xyz, math.asint(1f));
-                                mixBuffer[boneIndex]     = RootMotionTools.ConcatenateDeltas(mixBuffer[boneIndex], in add);
+                                int boneIndex        = m * 64 + i;
+                                var add              = sampleBuffer[boneIndex];
+                                var position         = add.position * layerWeight;
+                                var rotation         = math.nlerp(quaternion.identity, add.rotation, layerWeight);
+                                var scaleStretch     = math.lerp(1f, new float4(add.stretch, add.scale), layerWeight);
+                                add                  = new TransformQvvs(position, rotation, scaleStretch.w, scaleStretch.xyz, math.asint(1f));
+                                mixBuffer[boneIndex] = RootMotionTools.ConcatenateDeltas(mixBuffer[boneIndex], in add);
                             }
                         }
                     }
@@ -232,13 +232,13 @@ namespace Latios.MecanimV2
                             var bits = maskPtr[m];
                             for (int i = math.tzcnt(bits); i < 64; bits ^= 1ul << i, i = math.tzcnt(bits))
                             {
-                                int boneIndex = m * 64 + i;
-                                var oldBone  = mixBuffer[boneIndex];
-                                var newBone  = sampleBuffer[boneIndex];
-                                var position = math.lerp(oldBone.position, newBone.position, layerWeight);
-                                var rotation = math.nlerp(oldBone.rotation, newBone.rotation, layerWeight);
-                                var scale    = math.lerp(oldBone.scale, newBone.scale, layerWeight);
-                                var stretch  = math.lerp(oldBone.stretch, newBone.stretch, layerWeight);
+                                int boneIndex        = m * 64 + i;
+                                var oldBone          = mixBuffer[boneIndex];
+                                var newBone          = sampleBuffer[boneIndex];
+                                var position         = math.lerp(oldBone.position, newBone.position, layerWeight);
+                                var rotation         = math.nlerp(oldBone.rotation, newBone.rotation, layerWeight);
+                                var scale            = math.lerp(oldBone.scale, newBone.scale, layerWeight);
+                                var stretch          = math.lerp(oldBone.stretch, newBone.stretch, layerWeight);
                                 mixBuffer[boneIndex] = new TransformQvvs(position, rotation, scale, stretch, math.asint(1f));
                             }
                         }
@@ -366,8 +366,7 @@ namespace Latios.MecanimV2
 
                 if (clip.events.times.Length > 0)
                 {
-                    // Todo: Kinemation's built-in event sampling doesn't account for looping or transition start events correctly.
-                    // This should probably be improved.
+                    // Todo: Calculating the precise event times relative to realtime is quite tricky when looping needs to be taken into account.
                 }
 
                 var weight = stateWeight * result.weight;
