@@ -21,6 +21,20 @@ namespace Latios.Mecanim.Authoring
             }
         }
 
+        public int GetLayerIndex(FixedString128Bytes layerName)
+        {
+#if UNITY_EDITOR
+            var layers = controller.layers;
+            for (int i = 0; i < layers.Length; i++)
+            {
+                var layer = layers[i];
+                if (layer.name == layerName)
+                    return i;
+            }
+#endif
+            return -1;
+        }
+
         // Todo: What does the API look like for getting state machine state indices for code-driven crossfades?
         // Most likely, we'll implement crossfades purely by jumping to the target state and then starting an
         // inertial blend.
