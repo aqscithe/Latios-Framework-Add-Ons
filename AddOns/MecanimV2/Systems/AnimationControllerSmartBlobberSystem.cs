@@ -12,7 +12,7 @@ using Unity.Mathematics;
 using UnityEditor.Animations;
 using UnityEngine;
 
-namespace Latios.MecanimV2.Authoring.Systems
+namespace Latios.Mecanim.Authoring.Systems
 {
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [UpdateInGroup(typeof(SmartBlobberBakingGroup))]

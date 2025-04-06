@@ -1,14 +1,14 @@
 using Latios.Authoring;
 using Unity.Entities;
 
-namespace Latios.MecanimV2.Authoring
+namespace Latios.Mecanim.Authoring
 {
-    public static class MecanimV2BakingBootstrap
+    public static class MecanimBakingBootstrap
     {
         /// <summary>
         /// Adds Mecanim bakers and baking systems into baking world
         /// </summary>
-        public static void InstallMecanimV2Addon(ref CustomBakingBootstrapContext context)
+        public static void InstallMecanimAddon(ref CustomBakingBootstrapContext context)
         {
 #if UNITY_EDITOR
             context.filteredBakerTypes.Add(typeof(AnimatorSmartBaker));

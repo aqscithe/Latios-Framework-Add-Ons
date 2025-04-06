@@ -2,7 +2,7 @@ using System;
 using Latios.Kinemation;
 using Unity.Mathematics;
 
-namespace Latios.MecanimV2
+namespace Latios.Mecanim
 {
     public static class MotionEvaluation
     {

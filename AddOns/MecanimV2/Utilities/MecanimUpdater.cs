@@ -7,7 +7,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
-namespace Latios.MecanimV2
+namespace Latios.Mecanim
 {
     public static unsafe class MecanimUpdater
     {

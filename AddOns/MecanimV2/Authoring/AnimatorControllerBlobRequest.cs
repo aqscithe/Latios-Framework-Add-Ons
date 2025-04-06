@@ -3,7 +3,7 @@ using Latios.Authoring;
 using Unity.Entities;
 using UnityEditor.Animations;
 
-namespace Latios.MecanimV2.Authoring
+namespace Latios.Mecanim.Authoring
 {
     public static class MecanimBlobberAPIExtensions
     {

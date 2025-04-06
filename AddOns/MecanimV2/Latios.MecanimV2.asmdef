@@ -1,5 +1,5 @@
 {
-    "name": "Latios.MecanimV2",
+    "name": "Latios.Mecanim",
     "rootNamespace": "Latios.Mecanim",
     "references": [
         "GUID:46fe9b4ef94d76744bc0b97bc2f73d94",

@@ -3,7 +3,7 @@ using Latios.Kinemation;
 using Unity.Collections;
 using Unity.Entities;
 
-namespace Latios.MecanimV2
+namespace Latios.Mecanim
 {
     public struct MecanimController : IComponentData, IEnableableComponent
     {

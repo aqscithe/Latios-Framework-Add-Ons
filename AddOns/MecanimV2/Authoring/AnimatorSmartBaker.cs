@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 
-namespace Latios.MecanimV2.Authoring
+namespace Latios.Mecanim.Authoring
 {
     [TemporaryBakingType]
     internal struct MecanimSmartBakeItem : ISmartBakeItem<Animator>
@@ -27,7 +27,6 @@ namespace Latios.MecanimV2.Authoring
             // Bake clips
             var sourceClips         = runtimeAnimatorController.animationClips;
             var skeletonClipConfigs = new NativeArray<SkeletonClipConfig>(sourceClips.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            
 
             for (int i = 0; i < sourceClips.Length; i++)
             {
@@ -40,15 +39,15 @@ namespace Latios.MecanimV2.Authoring
                     settings = SkeletonClipCompressionSettings.kDefaultSettings
                 };
             }
-            
+
             // Bake controller
             baker.AddComponent(entity, new MecanimController
             {
-                speed = authoring.speed,
+                speed           = authoring.speed,
                 applyRootMotion = authoring.applyRootMotion,
             });
             BaseAnimatorControllerRef baseAnimatorControllerRef = baker.GetBaseControllerOf(runtimeAnimatorController);
-            
+
             // Bake parameters
             var parameters       = baseAnimatorControllerRef.parameters;
             var parametersBuffer = baker.AddBuffer<MecanimParameter>(entity);
@@ -76,13 +75,13 @@ namespace Latios.MecanimV2.Authoring
                 }
                 parametersBuffer.Add(parameterData);
             }
-            
+
             // Bake avatar masks and create StateMachines states buffer
             var layers = baseAnimatorControllerRef.controller.layers;
-            
-            var avatarMasks = new NativeList<UnityObjectRef<AvatarMask>>(1,Allocator.Temp);
+
+            var avatarMasks  = new NativeList<UnityObjectRef<AvatarMask> >(1,Allocator.Temp);
             var statesBuffer = baker.AddBuffer<MecanimStateMachineActiveStates>(entity);
-            
+
             foreach (var layer in layers)
             {
                 if (layer.avatarMask != null)
@@ -95,7 +94,7 @@ namespace Latios.MecanimV2.Authoring
                     statesBuffer.Add(MecanimStateMachineActiveStates.CreateInitialState());
                 }
             }
-            
+
             // Add build buffer element for layer weights if there is more than one layer
             DynamicBuffer<LayerWeights> weights = baker.AddBuffer<LayerWeights>(entity);
             for (var index = 0; index < layers.Length; index++)
@@ -103,15 +102,15 @@ namespace Latios.MecanimV2.Authoring
                 var layer = layers[index];
                 weights.Add(new LayerWeights { weight = index == 0 ? 1 : layer.defaultWeight });
             }
-            
+
             // Add events buffers (for clip events and state transition events)
-            baker.AddBuffer<MecanimClipEvent>(entity);
+            baker.AddBuffer<MecanimClipEvent>(           entity);
             baker.AddBuffer<MecanimStateTransitionEvent>(entity);
 
-            m_clipSetBlobHandle    = baker.RequestCreateBlobAsset(authoring, skeletonClipConfigs);
-            m_controllerBlobHandle = baker.RequestCreateBlobAsset(baseAnimatorControllerRef.controller);
+            m_clipSetBlobHandle     = baker.RequestCreateBlobAsset(authoring, skeletonClipConfigs);
+            m_controllerBlobHandle  = baker.RequestCreateBlobAsset(baseAnimatorControllerRef.controller);
             m_avatarMasksBlobHandle = baker.RequestCreateBlobAsset(authoring, avatarMasks.ToArray(Allocator.Temp));
-            
+
             return true;
         }
 
@@ -119,13 +118,13 @@ namespace Latios.MecanimV2.Authoring
         {
             var animatorController = entityManager.GetComponentData<MecanimController>(entity);
             animatorController.skeletonClipsBlob = m_clipSetBlobHandle.Resolve(entityManager);
-            animatorController.controllerBlob = m_controllerBlobHandle.Resolve(entityManager);
-            animatorController.boneMasksBlob = m_avatarMasksBlobHandle.Resolve(entityManager);
-            
+            animatorController.controllerBlob    = m_controllerBlobHandle.Resolve(entityManager);
+            animatorController.boneMasksBlob     = m_avatarMasksBlobHandle.Resolve(entityManager);
+
             entityManager.SetComponentData(entity, animatorController);
         }
     }
-    
+
     [DisableAutoCreation]
     internal class AnimatorSmartBaker : SmartBaker<Animator, MecanimSmartBakeItem>
     {

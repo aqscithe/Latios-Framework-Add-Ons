@@ -3,7 +3,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Latios.MecanimV2.Authoring
+namespace Latios.Mecanim.Authoring
 {
     public struct BaseAnimatorControllerRef
     {

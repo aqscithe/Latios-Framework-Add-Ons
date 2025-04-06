@@ -1,6 +1,6 @@
 ﻿using Unity.Entities;
 
-namespace Latios.MecanimV2
+namespace Latios.Mecanim
 {
     public struct MecanimClipEvent : IBufferElementData
     {

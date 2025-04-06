@@ -1,12 +1,12 @@
 using System;
-using Blob = Latios.MecanimV2.MecanimControllerBlob;
+using Blob = Latios.Mecanim.MecanimControllerBlob;
 using Latios.Kinemation;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
-namespace Latios.MecanimV2
+namespace Latios.Mecanim
 {
     public static class StateMachineEvaluation
     {
