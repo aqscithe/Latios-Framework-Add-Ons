@@ -1,4 +1,4 @@
-# Latios Framework Add-Ons [0.2.4]
+# Latios Framework Add-Ons [0.3.0]
 
 This is an extra Unity package for the Latios Framework containing various
 add-on modules and functionality.
@@ -42,7 +42,7 @@ how to contribute your own add-ons or improve existing add-ons.
 -   Mecanim V1 – The original Mecanim runtime implementation that used to be in
     the Mimic module
 -   Mecanim V2 – A new Mecanim runtime implementation that aims to fix
-    deep-rooted issues in V1 (still under construction)
+    deep-rooted issues in V1
 -   KAG50 – An animation state machine and graph implementation that was
     originally written for Entities 0.50
 
@@ -54,5 +54,5 @@ how to contribute your own add-ons or improve existing add-ons.
 
 ## Special Thanks To These Awesome Contributors
 
+-   Alejandro Nunez – Primary co-author of Mecanim V2
 -   Sovogal – Primary author of Mecanim V1
--   Alemnunez – Fix for broken inert rule in KAG50
