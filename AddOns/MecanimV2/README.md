@@ -26,7 +26,7 @@ Add the following installer lines to your bootstrap after Kinemation:
 
 ```csharp
 // In LatiosBakingBootstrap
-Latios.Mecanim.MecanimBakingBootstrap.InstallMecanimAddon(ref context);
+Latios.Mecanim.Authoring.MecanimBakingBootstrap.InstallMecanimAddon(ref context);
 
 // In LatiosBootstrap
 Latios.Mecanim.MecanimBootstrap.InstallMecanimAddon(world);
