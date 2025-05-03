@@ -74,7 +74,7 @@ scenarios. This document uses tables to highlight the differences.
 | Layer Weight Modification | Supported                 | Not Supported                                                       | Supported                                              |
 | Apply Root Motion Toggle  | Supported                 | IComponentData only                                                 | Supported                                              |
 | Manual Updating           | Supported                 | Not Supported                                                       | Supported                                              |
-| Crossfade on Demand       | Supported                 | Supported                                                           | Not Supported                                          |
+| Crossfade on Demand       | Supported                 | Supported                                                           | Supported                                              |
 | Info On All Clips Sampled | Supported                 | Supported                                                           | Not Supported                                          |
 | State Transition Events   | Not Supported             | Not Supported                                                       | Accumulated in dynamic buffer                          |
 | Clip Events               | Supported                 | Accumulated in dynamic buffer                                       | Not Supported                                          |

@@ -82,6 +82,15 @@ Another extension method is provided for the `parameters` array called
 name, and if found, return the parameter index as an `out` argument. You can
 save this index inside an `IComponentData` or blob asset for use at runtime.
 
+### Discrete Parameter Smoothing
+
+Sometimes, game logic may dictate sudden changes in parameters that can result
+in large frame-to-frame differences in the resulting animation. While
+traditionally, the approach would be to smooth out parameters for smoother
+blending, Mecanim V2 offers an alternative. At any time, you can start an
+inertial blend from the previous frame via `StartInertialBlend()`. This smooths
+out sudden drastic changes to blend trees or layer weights.
+
 ## Layers
 
 Similar to parameters, you can retrieve layer indices at runtime through
