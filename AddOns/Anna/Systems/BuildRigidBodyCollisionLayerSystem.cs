@@ -187,15 +187,15 @@ namespace Latios.Anna.Systems
                                                        out var mass,
                                                        out var inertialPoseWorldTransform);
 
-                    rigidBody.velocity.linear += physicsSettings.gravity * dt;
+                    rigidBody.velocity.linear += physicsSettings.gravity * dt * rigidBody.timeScale; // Do I apply the timescale here?
                     if (impulses.Length > 0)
                     {
                         foreach (var impulse in impulses[i])
                         {
                             if (impulse.pointImpulseOrZero.Equals(float3.zero))
-                                UnitySim.ApplyFieldImpulse(ref rigidBody.velocity, in mass, impulse.pointOrField);
+                                UnitySim.ApplyFieldImpulse(ref rigidBody.velocity, in mass, impulse.pointOrField * rigidBody.timeScale);
                             else
-                                UnitySim.ApplyImpulseAtWorldPoint(ref rigidBody.velocity, in mass, in inertialPoseWorldTransform, impulse.pointOrField, impulse.pointImpulseOrZero);
+                                UnitySim.ApplyImpulseAtWorldPoint(ref rigidBody.velocity, in mass, in inertialPoseWorldTransform, impulse.pointOrField, impulse.pointImpulseOrZero * rigidBody.timeScale);
                         }
                         impulses[i].Clear();
                     }
@@ -220,7 +220,8 @@ namespace Latios.Anna.Systems
                         motionExpansion                    = motionExpansion,
                         motionStabilizer                   = UnitySim.MotionStabilizer.kDefault,
                         numOtherSignificantBodiesInContact = 0,
-                        velocity                           = rigidBody.velocity
+                        velocity                           = rigidBody.velocity,
+                        timeScale                          = rigidBody.timeScale,
                     };
 
                     if (lockAxes != null)

@@ -12,6 +12,7 @@ namespace Latios.Anna.Authoring
         public float mass                     = 1f;
         public float coefficientOfFriction    = 0.3f;
         public float coefficientOfRestitution = 0.3f;
+        public float timeScale = 1f;
 
         [Header("Constraints")]
         public bool3 lockPositionAxes    = false;
@@ -39,7 +40,8 @@ namespace Latios.Anna.Authoring
                 {
                     linear  = authoring.initialVelocity,
                     angular = float3.zero
-                }
+                },
+                timeScale = authoring.timeScale
             });
             if (math.any(authoring.lockPositionAxes | authoring.lockRotationAxes) || authoring.forceLockAxesExists)
             {

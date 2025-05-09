@@ -12,6 +12,7 @@ namespace Latios.Anna
         public float             inverseMass;
         public half              coefficientOfFriction;
         public half              coefficientOfRestitution;
+        public float             timeScale;
     }
 
     [InternalBufferCapacity(0)]
