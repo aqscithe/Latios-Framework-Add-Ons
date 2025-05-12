@@ -90,8 +90,8 @@ namespace Latios.Anna
                                            rigidBodyA.coefficientOfFriction,
                                            UnitySim.kMaxDepenetrationVelocityDynamicStatic,
                                            math.max(0f, math.dot(rigidBodyA.gravity, -contacts.contactNormal)),
-                                           deltaTime,
-                                           inverseDeltaTime);
+                                           deltaTime * rigidBodyA.timeScale,
+                                           inverseDeltaTime /  rigidBodyA.timeScale);
                 }
             }
         }

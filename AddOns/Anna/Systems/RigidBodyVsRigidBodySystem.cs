@@ -76,6 +76,10 @@ namespace Latios.Anna.Systems
                     streamData.indexB            = result.sourceIndexB;
                     pair.userByte                = SolveByteCodes.contactBody;
 
+                    float combinedTimeScale = math.min(rigidBodyA.timeScale, rigidBodyB.timeScale);
+                    float finalTimescale = deltaTime * combinedTimeScale;
+                    //float finalInverse = math.rcp(finalTimescale);
+
                     UnitySim.BuildJacobian(streamData.contactParameters.AsSpan(),
                                            out streamData.bodyParameters,
                                            rigidBodyA.inertialPoseWorldTransform,
@@ -90,8 +94,8 @@ namespace Latios.Anna.Systems
                                            coefficientOfFriction,
                                            UnitySim.kMaxDepenetrationVelocityDynamicDynamic,
                                            math.max(0f, math.max(math.dot(rigidBodyA.gravity, -contacts.contactNormal), -math.dot(rigidBodyB.gravity, -contacts.contactNormal))),
-                                           deltaTime,
-                                           inverseDeltaTime);
+                                           finalTimescale,
+                                           inverseDeltaTime / combinedTimeScale);
                 }
             }
         }
