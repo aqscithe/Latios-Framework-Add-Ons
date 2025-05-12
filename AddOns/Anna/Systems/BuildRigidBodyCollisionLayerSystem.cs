@@ -187,7 +187,8 @@ namespace Latios.Anna.Systems
                                                        out var mass,
                                                        out var inertialPoseWorldTransform);
 
-                    rigidBody.velocity.linear += physicsSettings.gravity * dt * rigidBody.timeScale; // Do I apply the timescale here?
+                    float scaledGravityFactor = rigidBody.timeScale * rigidBody.timeScale;
+                    rigidBody.velocity.linear += physicsSettings.gravity * dt * scaledGravityFactor;
                     if (impulses.Length > 0)
                     {
                         foreach (var impulse in impulses[i])
