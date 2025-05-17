@@ -219,8 +219,8 @@ namespace Latios.Mecanim.Authoring.Systems
 
                 BakeState(ref statesBuilder[i], i, stateInfos[i].animationState, parameters);
 
-                stateNameHashesBuilder[i]       = stateInfos[i].fullPathName.GetHashCode();
-                stateNameEditorHashesBuilder[i] = stateInfos[i].fullPathName.GetHashCode();
+                stateNameHashesBuilder[i]       = new FixedString128Bytes(stateInfos[i].fullPathName).GetHashCode();
+                stateNameEditorHashesBuilder[i] = Animator.StringToHash(stateInfos[i].fullPathName);
                 stateNamesBuilder[i]            = stateInfos[i].fullPathName;
                 stateTagsBuilder[i]             = stateInfos[i].animationState.tag;
             }
@@ -731,7 +731,7 @@ namespace Latios.Mecanim.Authoring.Systems
                         {
                             var pjmag = math.length(pj);
                             pipj.x = (pjmag - pimag) / (0.5f * (pimag + pjmag));
-                            var direction = LatiosMath.ComplexMul(pi, new float2(pj.x, -pj.y));
+                            var direction     = LatiosMath.ComplexMul(pi, new float2(pj.x, -pj.y));
                             var directionAtan = math.select(math.atan2(direction.y, direction.x), 0, pi.Equals(float2.zero) || pj.Equals(float2.zero));
                             pipj.y = MecanimControllerBlob.BlendTree.kFreeformDirectionalBias * directionAtan;
                             pipj.w = 1f / (0.5f * (pimag + pjmag));
@@ -914,12 +914,12 @@ namespace Latios.Mecanim.Authoring.Systems
             {
                 var parameter = animatorController.parameters[i];
 
-                int nameHash = parameter.name.GetHashCode();
+                int nameHash = new FixedString64Bytes(parameter.name).GetHashCode();
 
                 MecanimControllerBlob.ParameterTypes.PackTypeIntoBlobBuilder(ref packedTypes, i, parameter.type);
 
                 parameterNameHashes[i]       = nameHash;
-                parameterEditorNameHashes[i] = nameHash;
+                parameterEditorNameHashes[i] = parameter.nameHash;
                 parameterNames[i]            = parameter.name;
             }
         }

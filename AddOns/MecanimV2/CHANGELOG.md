@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] – 2025-5-17
+
+### Fixed
+
+-   Fixed baking of name hashes for states and parameters to use the fixed
+    string hashers and `UnityEngine.Animator` hashers
+
 ## [0.1.1] – 2025-5-3
 
 ### Added
