@@ -15,11 +15,12 @@ namespace Latios.Anna
                 return latiosWorld.worldBlackboardEntity.GetComponentData<PhysicsSettings>();
             return new PhysicsSettings
             {
-                collisionLayerSettings = CollisionLayerSettings.kDefault,
-                gravity                = new float3(0f, -9.81f, 0f),
-                linearDamping          = (half)0.05f,
-                angularDamping         = (half)0.05f,
-                numIterations          = 4
+                collisionLayerSettings                       = CollisionLayerSettings.kDefault,
+                gravity                                      = new float3(0f, -9.81f, 0f),
+                linearDamping                                = (half)0.05f,
+                angularDamping                               = (half)0.05f,
+                rigidBodyVsRigidBodyMaxDepenetrationVelocity = (half)UnitySim.kMaxDepenetrationVelocityDynamicDynamic,
+                numIterations                                = 4
             };
         }
     }

@@ -60,14 +60,15 @@ namespace Latios.Anna.Systems
             UnitySim.ConstraintTauAndDampingFrom(UnitySim.kStiffSpringFrequency, UnitySim.kStiffDampingRatio, dt, settings.numIterations, out var tau, out var damping);
             world.sceneBlackboardEntity.SetComponentData(new ConstraintWritingConstants
             {
-                constraintStartGlobalVersion = state.GlobalSystemVersion,
-                deltaTime                    = dt,
-                inverseDeltaTime             = 1f / dt,
-                isInConstraintWritingPhase   = true,
-                numIterations                = settings.numIterations,
-                numSubSteps                  = 1,
-                stiffDamping                 = damping,
-                stiffTau                     = tau
+                constraintStartGlobalVersion                 = state.GlobalSystemVersion,
+                deltaTime                                    = dt,
+                inverseDeltaTime                             = 1f / dt,
+                isInConstraintWritingPhase                   = true,
+                numIterations                                = settings.numIterations,
+                numSubSteps                                  = 1,
+                stiffDamping                                 = damping,
+                stiffTau                                     = tau,
+                rigidBodyVsRigidBodyMaxDepenetrationVelocity = settings.rigidBodyVsRigidBodyMaxDepenetrationVelocity
             });
         }
 

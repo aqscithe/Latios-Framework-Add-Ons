@@ -14,7 +14,8 @@ namespace Latios.Anna
         [Range(0f, 1f)]
         public float linearDamping = 0.05f;
         [Range(0f, 1f)]
-        public float angularDamping = 0.05f;
+        public float angularDamping                               = 0.05f;
+        public float rigidBodyVsRigidBodyMaxDepenetrationVelocity = UnitySim.kMaxDepenetrationVelocityDynamicDynamic;
         [Min(1)]
         public int solverIterations = 4;
     }
@@ -31,10 +32,11 @@ namespace Latios.Anna
                     worldAabb                = new Aabb(authoring.worldBounds.min, authoring.worldBounds.max),
                     worldSubdivisionsPerAxis = math.max(1, authoring.subdivisionsPerAxis)
                 },
-                gravity        = authoring.gravity,
-                linearDamping  = (half)authoring.linearDamping,
-                angularDamping = (half)authoring.angularDamping,
-                numIterations  = (byte)authoring.solverIterations
+                gravity                                      = authoring.gravity,
+                linearDamping                                = (half)authoring.linearDamping,
+                angularDamping                               = (half)authoring.angularDamping,
+                rigidBodyVsRigidBodyMaxDepenetrationVelocity = (half)authoring.rigidBodyVsRigidBodyMaxDepenetrationVelocity,
+                numIterations                                = (byte)authoring.solverIterations
             });
         }
     }

@@ -31,6 +31,7 @@ namespace Latios.Anna
         public int   numSubSteps;
         public float stiffDamping;
         public float stiffTau;
+        public float rigidBodyVsRigidBodyMaxDepenetrationVelocity;
         public uint  constraintStartGlobalVersion;
         public bool  isInConstraintWritingPhase;
     }

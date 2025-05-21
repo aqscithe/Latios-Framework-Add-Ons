@@ -12,6 +12,7 @@ namespace Latios.Anna
         public float3                 gravity;
         public half                   linearDamping;
         public half                   angularDamping;
+        public half                   rigidBodyVsRigidBodyMaxDepenetrationVelocity;
         public byte                   numIterations;
     }
 

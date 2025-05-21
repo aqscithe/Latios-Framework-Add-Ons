@@ -542,6 +542,19 @@ namespace Latios.Anna
         {
             internal PairStream.ParallelWriter pairStream;
 
+            /// <summary>
+            /// Writes speculative contact constraints between two rigid bodies
+            /// </summary>
+            /// <param name="constraintEntityInfoLookup">Constraint-writing context from the sceneBlackboardEntity</param>
+            /// <param name="result">The pair of entities discovered in a FindPairs operation</param>
+            /// <param name="rigidBodyHandleA">The first rigid body which must correspond to result.entityA (this is checked)</param>
+            /// <param name="rigidBodyHandleB">The second rigid body which must correspond to result.entityB (this is checked)</param>
+            /// <param name="contactNormal">The contact normal as produced by UnitySim.ContactsBetween()</param>
+            /// <param name="contacts">The contact point pairs as produced by UnitySim.ContactsBetween()</param>
+            /// <param name="coefficientOfRestitution">The bounciness of the impact</param>
+            /// <param name="coefficientOfFriction">The tendency for the objects to slow down when rubbing against each other</param>
+            /// <param name="maxDepenetrationVelocity">The maximum amound of velocity to add to the rigid bodies if they somehow start off in a penetrating state.
+            /// A negative value will result in the value from PhysicsSettings being used instead.</param>
             public void SpeculateContactsBetween(ref ConstraintEntityInfoLookup constraintEntityInfoLookup,
                                                  in FindPairsResult result,
                                                  in ConstraintEntityInfoLookup.RigidBodyHandle rigidBodyHandleA,
@@ -550,7 +563,7 @@ namespace Latios.Anna
                                                  ReadOnlySpan<UnitySim.ContactsBetweenResult.ContactOnB> contacts,
                                                  float coefficientOfRestitution,
                                                  float coefficientOfFriction,
-                                                 float maxDepenetrationVelocity = UnitySim.kMaxDepenetrationVelocityDynamicDynamic)
+                                                 float maxDepenetrationVelocity = -1f)
             {
                 CheckEntitiesEqual(rigidBodyHandleA.entity, result.entityA, false);
                 CheckEntitiesEqual(rigidBodyHandleB.entity, result.entityB, true);
@@ -577,7 +590,8 @@ namespace Latios.Anna
                                        contacts,
                                        coefficientOfRestitution,
                                        coefficientOfFriction,
-                                       maxDepenetrationVelocity,
+                                       math.select(maxDepenetrationVelocity, constraintEntityInfoLookup.constants.rigidBodyVsRigidBodyMaxDepenetrationVelocity,
+                                                   maxDepenetrationVelocity < 0f),
                                        math.max(0f, math.max(math.dot(rigidBodyA.gravity, -contactNormal), -math.dot(rigidBodyB.gravity, -contactNormal))),
                                        constraintEntityInfoLookup.constants.deltaTime,
                                        constraintEntityInfoLookup.constants.inverseDeltaTime,
