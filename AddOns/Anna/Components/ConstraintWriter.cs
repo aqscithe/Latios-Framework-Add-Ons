@@ -39,7 +39,7 @@ namespace Latios.Anna
             var positions                  = axesToLock.packedFlags & 0x7;
             if (positions != 0)
             {
-                var     bools      = positions == new int3(1, 2, 4);
+                var     bools      = (positions & new int3(1, 2, 4)) != 0;
                 ref var streamData = ref pairStream.AddPairAndGetRef<PositionConstraintData>(rigidBodyHandle.entity,
                                                                                              bucketIndex,
                                                                                              true,
