@@ -35,6 +35,14 @@ Add the following to `LatiosBootstrap` (only the runtime is necessary):
 Latios.Anna.AnnaBootstrap.InstallAnna(world);
 ```
 
+This method returns an `AnnaSuperSystem`, which you can use to install an
+`IRateManager` like this:
+
+```csharp
+var anna = Latios.Anna.AnnaBootstrap.InstallAnna(world);
+anna.SetRateManagerCreateAllocator(new SubstepRateManager(0.034f, 8));
+```
+
 ### Basic Usage
 
 Use the `CollisionTagAuthoring` component to specify static environment and
@@ -45,10 +53,11 @@ scene properties.
 At runtime, you can either directly modify the `RigidBody` values, or you can
 use the `AddImpulse` dynamic buffer.
 
-You can disable collision between pairs of entities by adding a
-`DynamicBuffer<CollisionExclusionPair>` buffer to any entities, including system
-entities. Neither order within a pair, or order amongst pairs matter (that is,
-it behaves in the way you would expect if you don’t overthink it).
+You can disable collision between pairs of entity queries by adding a
+`DynamicBuffer<CollisionExclusionPair>` buffer to any entity, including system
+entities. An exclusion will match independent of the ordering of entities found
+in a pair (that is, it behaves in the way you would expect if you don’t
+overthink it).
 
 ### Shockwave Integration
 

@@ -6,13 +6,19 @@ namespace Latios.Anna
 {
     public static class AnnaBootstrap
     {
-        public static void InstallAnna(World world)
+        /// <summary>
+        /// Installs Anna Physics and returns the main AnnaSuperSystem in case you want to attach an IRateManager to it
+        /// (such as SubstepRateManager)
+        /// </summary>
+        public static Systems.AnnaSuperSystem InstallAnna(World world)
         {
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.AnnaSuperSystem>(),                 world);
+            var result = BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.AnnaSuperSystem>(),                 world);
 
 #if LATIOS_ADDON_SHOCKWAVE
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.BuildWorldCollisionAspectSystem>(), world);
 #endif
+
+            return result.systemManaged as Systems.AnnaSuperSystem;
         }
     }
 }
