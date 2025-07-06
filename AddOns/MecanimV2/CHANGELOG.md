@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] – 2025-7-6
+
+### Changed
+
+-   Blend tree blending and transition crossfades now use frequency blending
+    rather than duration blending
+
+### Fixed
+
+-   Fixed time scale values being inverted in blend tree clips
+
 ## [0.1.2] – 2025-5-17
 
 ### Fixed

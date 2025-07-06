@@ -1,4 +1,4 @@
-# Latios Framework Add-Ons [0.3.2]
+# Latios Framework Add-Ons [0.4.0]
 
 This is an extra Unity package for the Latios Framework containing various
 add-on modules and functionality.
@@ -39,20 +39,29 @@ how to contribute your own add-ons or improve existing add-ons.
 
 ### Animation
 
--   Mecanim V1 – The original Mecanim runtime implementation that used to be in
-    the Mimic module
--   Mecanim V2 – A new Mecanim runtime implementation that aims to fix
-    deep-rooted issues in V1
--   KAG50 – An animation state machine and graph implementation that was
-    originally written for Entities 0.50
+-   Mecanim V1 (DreamingImLatios & Sovogal) – The original Mecanim runtime
+    implementation that used to be in the Mimic module
+-   Mecanim V2 (DreamingImLatios & Alejandro Nunez) – A new Mecanim runtime
+    implementation that aims to fix deep-rooted issues in V1
+-   KAG50 (DreamingImLatios port) – An animation state machine and graph
+    implementation that was originally written for Entities 0.50
+
+### Navigation
+
+-   FlowFields Navigation (Webheart) – A system-less flow fields solution with
+    Psyshock compatibility
+-   Navigator (clandais) – A nav-mesh solution that bakes Unity NavMesh objects
+    into a pure ECS runtime with custom runtime agent navigation
 
 ### Rendering and Visual Effects
 
--   Cyline – A simple 3D Line Renderer
--   Shuriken – A recreation of Unity’s particle system in pure ECS (still under
-    construction)
+-   Cyline (DreamingImLatios port) – A simple 3D Line Renderer
+-   Shuriken (DreamingImLatios) – A recreation of Unity’s particle system in
+    pure ECS (still under construction)
 
 ## Special Thanks To These Awesome Contributors
 
+-   Webheart – Primary author of FlowFields Navigation
+-   clandais – Primary author of Navigator
 -   Alejandro Nunez – Primary co-author of Mecanim V2
 -   Sovogal – Primary author of Mecanim V1

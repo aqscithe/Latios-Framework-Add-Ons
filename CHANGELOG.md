@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-7-6
+
+### Added
+
+-   Added Shockwave v0.1.0
+-   Added FlowFields Navigation v0.1.0
+-   Added Navigator
+
+### Changed
+
+-   Updated Anna to v0.2.0
+-   Updated Mecanim V2 to v0.1.3
+
 ## [0.3.2] - 2025-5-17
 
 ### Changed

@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] – 2025-7-6
+
+### Added
+
+-   *New Feature:* Added `ConstraintWriter` API and inject-target
+    `ConstraintWritingSuperSystem` to allow custom collision and joints to be
+    fed into Anna’s solver
+-   *New Feature:* Added the ability to exclude pairs of entity queries from
+    collision via `CollisionExclusionPair` dynamic buffer which can be assigned
+    to any number of entities including system entities
+-   Added `rigidBodyVsRigidBodyMaxDepenetrationVelocity` to `AnnaSettings`
+-   Added new angular-only `AddImpulse` constructor
+-   `AnnaBootstrap` now returns the `AnnaSuperSystem` so that users can install
+    an `IRateManager` for it, such as a `SubstepRateManager`
+
+### Changed
+
+-   **Breaking:** Spatial queries now need to use either Shockwave or
+    `ConstraintCollisionWorld`
+
+### Fixed
+
+-   Fixed position locking on multiple axes
+
+### Improved
+
+-   Improved collision behavior in many use cases with the upgrade to Psyshock
+    0.13.0
+
+### Removed
+
+-   Removed `EnvironmentCollisionLayer`, `KinematicCollisionLayer`, and
+    `RigidBodyCollisionLayer` collection components
+
 ## [0.1.2] – 2025-3-29
 
 ### Fixed
