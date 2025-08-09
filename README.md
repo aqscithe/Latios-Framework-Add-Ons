@@ -1,4 +1,4 @@
-# Latios Framework Add-Ons [0.4.0]
+# Latios Framework Add-Ons [0.4.1]
 
 This is an extra Unity package for the Latios Framework containing various
 add-on modules and functionality.
@@ -65,3 +65,4 @@ how to contribute your own add-ons or improve existing add-ons.
 -   clandais – Primary author of Navigator
 -   Alejandro Nunez – Primary co-author of Mecanim V2
 -   Sovogal – Primary author of Mecanim V1
+-   Obrazy – Contributor to Anna

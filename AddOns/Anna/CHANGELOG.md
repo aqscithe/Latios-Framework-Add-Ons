@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] – 2025-8-9
+
+### Added
+
+-   Added optional components `LocalCenterOfMassOverride` and
+    `LocalInertiaOverride` which can be attached to rigid bodies
+
 ## [0.2.0] – 2025-7-6
 
 ### Added

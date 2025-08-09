@@ -21,7 +21,7 @@ provides an API for feeding constraints directly to the solver.
 
 **Main Author(s):** Dreaming I’m Latios
 
-**Additional Contributors:**
+**Additional Contributors:** Obrazy
 
 **Support:** Please make feature requests for features you would like to see
 added! You can use any of the Latios Framework support channels to make
@@ -84,6 +84,12 @@ live on the `sceneBlackboardEntity`.
 colliders, and metadata for describing springs. These three things are only
 valid for a single update. *In case you were wondering, springs are
 timestep-dependent.*
+
+### Other Customizations
+
+You can override the center of mass and the inertia tensor by adding
+`LocalCenterOfMassOverride` and `LocalInertiaOverride` components to the rigid
+body.
 
 ## Known Issue
 
