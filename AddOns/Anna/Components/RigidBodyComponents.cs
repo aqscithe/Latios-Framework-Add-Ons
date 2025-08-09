@@ -1,7 +1,5 @@
 using Latios.Psyshock;
-using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace Latios.Anna
@@ -40,5 +38,14 @@ namespace Latios.Anna
             impulse.z   = float.NaN;
         }
     }
-}
 
+    public struct LocalCenterOfMassOverride : IComponentData
+    {
+        public float3 centerOfMass;
+    }
+
+    public struct LocalInertiaOverride : IComponentData
+    {
+        public UnitySim.LocalInertiaTensorDiagonal inertiaDiagonal;
+    }
+}

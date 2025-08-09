@@ -52,18 +52,20 @@ namespace Latios.Anna.Systems
 
             jh = new BuildJob
             {
-                aabbHandle       = GetComponentTypeHandle<CollisionWorldAabb>(false),
-                addImpulseHandle = GetBufferTypeHandle<AddImpulse>(false),
-                bucketCalculator = new CollisionLayerBucketIndexCalculator(in physicsSettings.collisionLayerSettings),
-                colliderHandle   = GetComponentTypeHandle<Collider>(true),
-                dt               = Time.DeltaTime,
-                entityHandle     = GetEntityTypeHandle(),
-                entityToIndexMap = entityToIndexMap.AsParallelWriter(),
-                physicsSettings  = physicsSettings,
-                rigidBodyHandle  = GetComponentTypeHandle<RigidBody>(false),
-                startIndices     = startIndices,
-                states           = states,
-                transformHandle  = GetComponentTypeHandle<WorldTransform>(true)
+                aabbHandle            = GetComponentTypeHandle<CollisionWorldAabb>(false),
+                addImpulseHandle      = GetBufferTypeHandle<AddImpulse>(false),
+                bucketCalculator      = new CollisionLayerBucketIndexCalculator(in physicsSettings.collisionLayerSettings),
+                centerOverrideHandle  = GetComponentTypeHandle<LocalCenterOfMassOverride>(true),
+                colliderHandle        = GetComponentTypeHandle<Collider>(true),
+                dt                    = Time.DeltaTime,
+                entityHandle          = GetEntityTypeHandle(),
+                entityToIndexMap      = entityToIndexMap.AsParallelWriter(),
+                inertiaOverrideHandle = GetComponentTypeHandle<LocalInertiaOverride>(true),
+                physicsSettings       = physicsSettings,
+                rigidBodyHandle       = GetComponentTypeHandle<RigidBody>(false),
+                startIndices          = startIndices,
+                states                = states,
+                transformHandle       = GetComponentTypeHandle<WorldTransform>(true)
             }.ScheduleParallel(m_query, JobHandle.CombineDependencies(state.Dependency, jh));
 
             latiosWorld.sceneBlackboardEntity.SetCollectionComponentAndDisposeOld(new CapturedRigidBodies
@@ -77,10 +79,12 @@ namespace Latios.Anna.Systems
         [BurstCompile]
         partial struct BuildJob : IJobChunk
         {
-            [ReadOnly] public EntityTypeHandle                    entityHandle;
-            [ReadOnly] public ComponentTypeHandle<WorldTransform> transformHandle;
-            [ReadOnly] public ComponentTypeHandle<Collider>       colliderHandle;
-            [ReadOnly] public NativeArray<int>                    startIndices;
+            [ReadOnly] public EntityTypeHandle                               entityHandle;
+            [ReadOnly] public ComponentTypeHandle<WorldTransform>            transformHandle;
+            [ReadOnly] public ComponentTypeHandle<Collider>                  colliderHandle;
+            [ReadOnly] public ComponentTypeHandle<LocalCenterOfMassOverride> centerOverrideHandle;
+            [ReadOnly] public ComponentTypeHandle<LocalInertiaOverride>      inertiaOverrideHandle;
+            [ReadOnly] public NativeArray<int>                               startIndices;
 
             public ComponentTypeHandle<RigidBody>          rigidBodyHandle;
             public BufferTypeHandle<AddImpulse>            addImpulseHandle;
@@ -95,12 +99,14 @@ namespace Latios.Anna.Systems
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var entities    = chunk.GetEntityDataPtrRO(entityHandle);
-                var transforms  = (WorldTransform*)chunk.GetRequiredComponentDataPtrRO(ref transformHandle);
-                var colliders   = chunk.GetComponentDataPtrRO(ref colliderHandle);
-                var rigidBodies = (RigidBody*)chunk.GetRequiredComponentDataPtrRW(ref rigidBodyHandle);
-                var impulses    = chunk.GetBufferAccessor(ref addImpulseHandle);
-                var aabbs       = (Aabb*)chunk.GetComponentDataPtrRW(ref aabbHandle);
+                var entities         = chunk.GetEntityDataPtrRO(entityHandle);
+                var transforms       = (WorldTransform*)chunk.GetRequiredComponentDataPtrRO(ref transformHandle);
+                var colliders        = chunk.GetComponentDataPtrRO(ref colliderHandle);
+                var centerOverrides  = chunk.GetComponentDataPtrRO(ref centerOverrideHandle);
+                var inertiaOverrides = chunk.GetComponentDataPtrRO(ref inertiaOverrideHandle);
+                var rigidBodies      = (RigidBody*)chunk.GetRequiredComponentDataPtrRW(ref rigidBodyHandle);
+                var impulses         = chunk.GetBufferAccessor(ref addImpulseHandle);
+                var aabbs            = (Aabb*)chunk.GetComponentDataPtrRW(ref aabbHandle);
 
                 for (int i = 0, index = startIndices[unfilteredChunkIndex]; i < chunk.Count; i++, index++)
                 {
@@ -113,8 +119,8 @@ namespace Latios.Anna.Systems
                     Collider collider          = colliders == null ? default(SphereCollider) : colliders[i];
                     var      aabb              = Physics.AabbFrom(in collider, in transform.worldTransform);
                     var      angularExpansion  = UnitySim.AngularExpansionFactorFrom(in collider);
-                    var      localCenterOfMass = UnitySim.LocalCenterOfMassFrom(in collider);
-                    var      localInertia      = UnitySim.LocalInertiaTensorFrom(in collider, transform.stretch);
+                    var      localCenterOfMass = centerOverrides == null ? UnitySim.LocalCenterOfMassFrom(in collider) : centerOverrides[i].centerOfMass;
+                    var      localInertia      = inertiaOverrides == null ? UnitySim.LocalInertiaTensorFrom(in collider, transform.stretch) : inertiaOverrides[i].inertiaDiagonal;
                     UnitySim.ConvertToWorldMassInertia(in transform.worldTransform,
                                                        in localInertia,
                                                        localCenterOfMass,
@@ -165,4 +171,3 @@ namespace Latios.Anna.Systems
         }
     }
 }
-
