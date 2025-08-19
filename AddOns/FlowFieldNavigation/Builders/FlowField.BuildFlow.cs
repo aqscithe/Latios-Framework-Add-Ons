@@ -97,7 +97,7 @@ namespace Latios.FlowFieldNavigation
             var count = (config.GoalsQuery.HasFilter() || config.GoalsQuery.UsesEnabledFiltering())
                 ? config.GoalsQuery.CalculateEntityCount()
                 : config.GoalsQuery.CalculateEntityCountWithoutFiltering();
-            flow.GoalCells.SetCapacity(count);
+            flow.GoalCells.SetCapacity(count * FlowSettings.MaxFootprintSize * FlowSettings.MaxFootprintSize);
 
             dependency = new FlowFieldInternal.CollectGoalsJob
             {
@@ -182,7 +182,7 @@ namespace Latios.FlowFieldNavigation
             var count = (config.GoalsQuery.HasFilter() || config.GoalsQuery.UsesEnabledFiltering())
                 ? config.GoalsQuery.CalculateEntityCount()
                 : config.GoalsQuery.CalculateEntityCountWithoutFiltering();
-            flow.GoalCells.SetCapacity(count);
+            flow.GoalCells.SetCapacity(count * FlowSettings.MaxFootprintSize * FlowSettings.MaxFootprintSize);
 
             dependency = new FlowFieldInternal.CollectGoalsJob
             {

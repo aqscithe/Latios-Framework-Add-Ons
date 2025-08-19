@@ -5,11 +5,19 @@ namespace Latios.FlowFieldNavigation
 {
     public static partial class FlowField
     {
-        public struct Goal : IComponentData { }
+        public struct Goal : IComponentData
+        {
+            public int FootprintSize;
+        }
 
         public struct AgentDirection : IComponentData
         {
             public float2 Value;
+        }
+
+        public struct AgentFootprint : IComponentData
+        {
+            public int Size;
         }
 
         public struct PrevPosition : IComponentData

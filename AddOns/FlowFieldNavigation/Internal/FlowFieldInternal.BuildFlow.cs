@@ -21,20 +21,28 @@ namespace Latios.FlowFieldNavigation
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var chunkTransforms = TypeHandles.WorldTransform.Resolve(chunk);
+                var chunkGoals = chunk.GetNativeArray(ref TypeHandles.GoalTypeHandle);
 
                 var enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
 
                 while (enumerator.NextEntityIndex(out var i))
                 {
                     var position = chunkTransforms[i].position;
+                    var footprintSize = chunkGoals[i].FootprintSize;
 
-                    if (!Field.TryWorldToFootprint(position, out var footprint, out _)) continue;
-                    GoalCells.AddNoResize(footprint.xy);
-                    if (footprint.x != footprint.z && footprint.y != footprint.w)
+                    if (!Field.TryWorldToFootprint(position, footprintSize, out var footprint)) continue;
+                    
+                    var minCell = footprint.xy;
+                    var maxCell = footprint.zw;
+                    
+                    for (var x = minCell.x; x <= maxCell.x; x++)
                     {
-                        GoalCells.AddNoResize(footprint.zy);
-                        GoalCells.AddNoResize(footprint.xw);
-                        GoalCells.AddNoResize(footprint.zw);
+                        for (var y = minCell.y; y <= maxCell.y; y++)
+                        {
+                            var cell = new int2(x, y);
+                            if (!Field.IsValidCell(cell)) continue;
+                            GoalCells.AddNoResize(cell);
+                        }
                     }
                 }
             }

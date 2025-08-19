@@ -37,7 +37,11 @@ namespace Latios.FlowFieldNavigation
                     offset = new float3(0, 0.1f, 0);
                 }
 
-                if (Field.DensityMap[index] > 0) color = Color.blue;
+                if (Field.DensityMap[index] > 0)
+                {
+                    offset = new float3(0, 0.15f, 0);
+                    color = Color.Lerp(Color.white, Color.blue, Field.DensityMap[index]);
+                }
                 
                 DrawCell(Field, Flow, index, offset, color);
             }

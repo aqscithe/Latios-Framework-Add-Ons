@@ -7,6 +7,11 @@ namespace Latios.FlowFieldNavigation
     [BurstCompile]
     public static class FieldExtensions
     {
+        public static bool IsValidCell(this Field field, int2 cell)
+        {
+            return Grid.IsValidCell(cell, field.Width, field.Height);
+        }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float3 GetLocalPosition(this Field field, float3 worldPosition)
         {
@@ -66,42 +71,30 @@ namespace Latios.FlowFieldNavigation
             return Grid.IsValidCell(cell, field.Width, field.Height);
         }
         
-        public static bool TryWorldToFootprint(this Field field, float3 worldPosition, out int4 footprint, out float2 interpolation)
+        public static bool TryWorldToFootprint(this Field field, float3 worldPosition, int footprintSize, out int4 footprint)
         {
             var localPos = worldPosition - field.Transform.Value.position;
             var invRotation = math.inverse(field.Transform.Value.rotation);
             var unrotatedPos = math.rotate(invRotation, localPos);
             var adjustedPos = unrotatedPos - field.GetGridOffset();
 
-            var gridCoords = new float2(adjustedPos.x / field.CellSize.x, adjustedPos.z / field.CellSize.y);
-            var relativeCoords = gridCoords - 0.5f;
-            var cell00 = new int2((int)math.floor(relativeCoords.x), (int)math.floor(relativeCoords.y));
-            interpolation = relativeCoords - cell00;
+            var gridCoords = new float2(
+                adjustedPos.x / field.CellSize.x,
+                adjustedPos.z / field.CellSize.y
+            );
 
-            var minX = int.MaxValue;
-            var minY = int.MaxValue;
-            var maxX = int.MinValue;
-            var maxY = int.MinValue;
-            var foundValid = false;
+            var centerOffset = math.select(0f, 0.5f, footprintSize % 2 == 0);
+            var centerCell = (int2)math.floor(gridCoords + centerOffset);
+            var halfSize = footprintSize / 2;
     
-            for (var dx = 0; dx < 2; dx++)
-            {
-                for (var dy = 0; dy < 2; dy++)
-                {
-                    var cell = cell00 + new int2(dx, dy);
-                    if (!Grid.IsValidCell(cell, field.Width, field.Height)) continue;
-                    foundValid = true;
-                    minX = math.min(minX, cell.x);
-                    minY = math.min(minY, cell.y);
-                    maxX = math.max(maxX, cell.x);
-                    maxY = math.max(maxY, cell.y);
-                }
-            }
+            var minX = centerCell.x - halfSize;
+            var minY = centerCell.y - halfSize;
+            var maxX = minX + footprintSize - 1;
+            var maxY = minY + footprintSize - 1;
 
-            if (!foundValid)
+            if (minX >= field.Width || maxX < 0 || minY >= field.Height || maxY < 0)
             {
                 footprint = default;
-                interpolation = default;
                 return false;
             }
 
