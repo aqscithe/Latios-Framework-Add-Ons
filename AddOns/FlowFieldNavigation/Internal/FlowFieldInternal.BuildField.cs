@@ -52,7 +52,7 @@ namespace Latios.FlowFieldNavigation
         {
             [ReadOnly] internal Field Field;
             [ReadOnly] internal FlowFieldAgentsTypeHandles TypeHandles;
-            internal NativeParallelMultiHashMap<int, float3>.ParallelWriter DensityHashMap;
+            internal NativeParallelMultiHashMap<int, float3> DensityHashMap;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -96,8 +96,6 @@ namespace Latios.FlowFieldNavigation
         [BurstCompile]
         internal struct AgentsPostProcessJob : IJobFor
         {
-            const int MaxUnitsOnCell = 8;
-            
             [ReadOnly] internal NativeParallelMultiHashMap<int, float3> DensityHashMap;
             internal NativeArray<float> DensityMap;
             internal NativeArray<float2> MeanVelocityMap;

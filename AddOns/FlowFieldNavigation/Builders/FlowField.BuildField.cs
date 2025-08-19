@@ -189,15 +189,15 @@ namespace Latios.FlowFieldNavigation
         {
             var dependency = inputDeps;
             var agentsCount = config.AgentsQuery.CalculateEntityCount();
-            var capacity = agentsCount * FlowSettings.MaxFootprintSize * FlowSettings.MaxFootprintSize;
+            var capacity = agentsCount;
             var densityHashMap = new NativeParallelMultiHashMap<int, float3>(capacity, Allocator.TempJob);
 
             dependency = new FlowFieldInternal.AgentsInfluenceJob
             {
-                DensityHashMap = densityHashMap.AsParallelWriter(),
+                DensityHashMap = densityHashMap,
                 Field = field,
                 TypeHandles = config.AgentTypeHandles
-            }.ScheduleParallel(config.AgentsQuery, dependency);
+            }.Schedule(config.AgentsQuery, dependency);
 
             dependency = new FlowFieldInternal.AgentsPostProcessJob
             {
@@ -226,7 +226,7 @@ namespace Latios.FlowFieldNavigation
 
             dependency = new FlowFieldInternal.AgentsInfluenceJob
             {
-                DensityHashMap = densityHashMap.AsParallelWriter(),
+                DensityHashMap = densityHashMap,
                 Field = field,
                 TypeHandles = config.AgentTypeHandles,
             }.Schedule(config.AgentsQuery, dependency);
