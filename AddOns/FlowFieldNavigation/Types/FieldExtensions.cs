@@ -28,8 +28,8 @@ namespace Latios.FlowFieldNavigation
         {
             var density = field.DensityMap[index];
             var velocity = field.MeanVelocityMap[index];
-            var length = math.length(velocity);
-            return math.lerp(1, length, math.saturate(density));
+            var speed = math.length(velocity);
+            return math.lerp(1, math.saturate(speed), math.saturate(density / FlowSettings.MaxDensity));
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

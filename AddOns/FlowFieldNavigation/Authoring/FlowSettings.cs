@@ -8,6 +8,7 @@ namespace Latios.FlowFieldNavigation
     {
         internal const float PassabilityLimit = 500000;
         internal const int MaxFootprintSize = 10;
+        internal const int MaxDensity = 10;
 
         [Range(0, 10)]
         public float DensityInfluence;

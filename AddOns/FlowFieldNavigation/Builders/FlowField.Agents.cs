@@ -32,7 +32,7 @@ namespace Latios.FlowFieldNavigation
         /// </remarks>
         public static FluentQuery PatchQueryForFlowFieldAgents(this FluentQuery fluent)
         {
-            return fluent.WithWorldTransformReadOnly().With<AgentDirection>().With<PrevPosition>().With<Velocity>().With<AgentFootprint>();
+            return fluent.WithWorldTransformReadOnly().With<AgentDirection>().With<PrevPosition>().With<Velocity>().With<AgentFootprint>().With<AgentDensity>();
         }
 
         /// <summary>

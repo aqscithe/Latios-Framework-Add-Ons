@@ -1,10 +1,13 @@
 ﻿using Latios.Psyshock;
 using Latios.Transforms;
+using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
+using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Latios.FlowFieldNavigation
@@ -59,6 +62,7 @@ namespace Latios.FlowFieldNavigation
                 var chunkTransforms = TypeHandles.WorldTransform.Resolve(chunk);
                 var chunkVelocities = chunk.GetNativeArray(ref TypeHandles.Velocity);
                 var chunkFootprints = chunk.GetNativeArray(ref TypeHandles.AgentFootprint);
+                var chunkDensities = chunk.GetNativeArray(ref TypeHandles.AgentDensity);
 
                 var enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
 
@@ -67,24 +71,30 @@ namespace Latios.FlowFieldNavigation
                     var position = chunkTransforms[i].position;
                     var footprintSize = chunkFootprints[i].Size;
                     var velocity = chunkVelocities[i].Value;
+                    var densityData = chunkDensities[i];
                     
                     if (!Field.TryWorldToFootprint(position, footprintSize, out var footprint)) continue;
                     
                     var minCell = footprint.xy;
                     var maxCell = footprint.zw;
-                    
+                    var radius = footprintSize / 2f;
+            
                     for (var x = minCell.x; x <= maxCell.x; x++)
                     {
                         for (var y = minCell.y; y <= maxCell.y; y++)
                         {
                             var cell = new int2(x, y);
                             if (!Field.IsValidCell(cell)) continue;
-                            
+                    
                             var cellCenter = Field.CellToWorld(cell);
-                            
+                    
                             var distance = math.distance(position.xz, cellCenter.xz);
-                            var weight = math.saturate(1f - distance / (footprintSize / 2f));
-                            
+                            if (distance > radius) continue;
+
+                            var normalizedDistance = distance / radius;
+                            var weight = densityData.MinWeight + (densityData.MaxWeight - densityData.MinWeight) * 
+                                math.pow(1 - normalizedDistance, densityData.Exponent);
+                    
                             var index = Field.CellToIndex(cell);
                             DensityHashMap.Add(index, new float3(velocity * weight, weight));
                         }
@@ -118,12 +128,12 @@ namespace Latios.FlowFieldNavigation
                 if (totalWeight <= 0f || count <= 1)
                 {
                     DensityMap[index] = 0;
-                    MeanVelocityMap[index] = 0;
+                    MeanVelocityMap[index] = totalVelocity;
                     return;
                 }
-                
-                DensityMap[index] = totalWeight * count;
-                MeanVelocityMap[index] = totalVelocity / totalWeight;
+
+                DensityMap[index] = math.min(totalWeight, FlowSettings.MaxDensity);
+                MeanVelocityMap[index] = totalVelocity / count;
             }
         }
     }

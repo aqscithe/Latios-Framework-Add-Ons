@@ -1,8 +1,10 @@
-﻿using Unity.Burst;
+﻿using System;
+using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace Latios.FlowFieldNavigation
 {
@@ -30,7 +32,8 @@ namespace Latios.FlowFieldNavigation
                     var position = chunkTransforms[i].position;
                     var prevPosition = prevPositions[i].Value;
                     var footprint = footprints[i].Size;
-                    velocities[i] = new FlowField.Velocity { Value = (position.xz - prevPosition) / DeltaTime };
+                    var newVelocity = (position.xz - prevPosition) / DeltaTime;
+                    velocities[i] = new FlowField.Velocity { Value = newVelocity };
                     prevPositions[i] = new FlowField.PrevPosition { Value = position.xz };
 
                     var newPos = CalculateFootprintDirection(position, footprint, in Field, in Flow);
@@ -39,7 +42,7 @@ namespace Latios.FlowFieldNavigation
             }
         }
 
-        static float2 CalculateFootprintDirection(float3 worldPos, int footprintSize, in Field field, in Flow flow)
+        static float2 CalculateFootprintDirection(float3 worldPos,int footprintSize, in Field field, in Flow flow)
         {
             if (!field.TryWorldToFootprint(worldPos, footprintSize, out var footprint))
             {
@@ -58,6 +61,9 @@ namespace Latios.FlowFieldNavigation
 
             var totalDirection = float2.zero;
             var totalWeight = 0f;
+            
+            var totalGradient = float2.zero;
+            var maxDensity = 0f;
 
             for (var x = footprint.x; x <= footprint.z; x++)
             {
@@ -72,20 +78,32 @@ namespace Latios.FlowFieldNavigation
                         x * field.CellSize.x + field.CellSize.x * 0.5f,
                         y * field.CellSize.y + field.CellSize.y * 0.5f
                     );
-
+                    
                     var distance = math.distance(gridCoords, cellCenter);
                     var weight = 1f / (1f + distance);
                     var direction = flow.GetDirection(index);
                     var speedFactor = field.GetSpeedFactor(index);
-
                     totalDirection += direction * speedFactor * weight;
                     totalWeight += weight;
+                    
+                    var density = field.DensityMap[index];
+                    maxDensity = math.max(maxDensity, density);
+                    var toAgent = gridCoords - cellCenter;
+                    totalGradient += toAgent * (density / FlowSettings.MaxDensity);
                 }
             }
-
+            
             if (totalWeight > 0)
             {
-                return totalDirection / totalWeight;
+                var flowDirection = totalDirection / totalWeight;
+                return flowDirection;
+                var flowLength = math.length(flowDirection);
+
+                var avoidanceDirection = math.normalizesafe(totalGradient);// / totalWeight);
+                var avoidanceStrength = math.saturate(maxDensity / FlowSettings.MaxDensity);
+                var blendedDirection = math.lerp(flowDirection, avoidanceDirection, avoidanceStrength);
+
+                return math.normalizesafe(blendedDirection) * flowLength;
             }
 
             return float2.zero;

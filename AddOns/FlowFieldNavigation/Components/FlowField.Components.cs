@@ -19,6 +19,13 @@ namespace Latios.FlowFieldNavigation
         {
             public int Size;
         }
+        
+        public struct AgentDensity : IComponentData
+        {
+            public float MinWeight;
+            public float MaxWeight;
+            public float Exponent;
+        }
 
         public struct PrevPosition : IComponentData
         {
