@@ -19,6 +19,7 @@ namespace Latios.FlowFieldNavigation
         internal NativeArray<int> PassabilityMap;
         internal NativeArray<float> DensityMap;
         internal NativeArray<float2> MeanVelocityMap;
+        internal NativeArray<int> UnitsCountMap;
         internal NativeArray<ColliderBody> CellColliders;
 
         FieldSettings settings;
@@ -33,6 +34,7 @@ namespace Latios.FlowFieldNavigation
             PassabilityMap = CollectionHelper.CreateNativeArray<int>(length, allocator);
             MeanVelocityMap = CollectionHelper.CreateNativeArray<float2>(length, allocator);
             CellColliders = CollectionHelper.CreateNativeArray<ColliderBody>(length, allocator, NativeArrayOptions.UninitializedMemory);
+            UnitsCountMap = CollectionHelper.CreateNativeArray<int>(length, allocator);
         }
 
         public void Dispose()
@@ -43,6 +45,7 @@ namespace Latios.FlowFieldNavigation
             MeanVelocityMap.Dispose();
             PassabilityMap.Dispose();
             CellColliders.Dispose();
+            UnitsCountMap.Dispose();
         }
 
         public JobHandle Dispose(JobHandle inputDeps)
@@ -54,7 +57,8 @@ namespace Latios.FlowFieldNavigation
                 DensityMap.Dispose(inputDeps),
                 MeanVelocityMap.Dispose(inputDeps),
                 PassabilityMap.Dispose(inputDeps),
-                CellColliders.Dispose(inputDeps)
+                CellColliders.Dispose(inputDeps),
+                UnitsCountMap.Dispose(inputDeps),
             });
         }
     }

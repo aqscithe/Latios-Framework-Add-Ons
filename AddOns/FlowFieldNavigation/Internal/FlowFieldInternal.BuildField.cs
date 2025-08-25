@@ -4,6 +4,7 @@ using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
@@ -50,13 +51,22 @@ namespace Latios.FlowFieldNavigation
             }
         }
 
+        internal struct AgentInfluenceData
+        {
+            public int Index;
+            public float2 Velocity;
+            public float Weight;
+        }
+
         [BurstCompile]
         internal struct AgentsInfluenceJob : IJobChunk
         {
             [ReadOnly] internal Field Field;
             [ReadOnly] internal FlowFieldAgentsTypeHandles TypeHandles;
-            internal NativeParallelMultiHashMap<int, float3> DensityHashMap;
-
+            internal UnsafeParallelBlockList Stream;
+            
+            [NativeSetThreadIndex] int threadIndex;
+            
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var chunkTransforms = TypeHandles.WorldTransform.Resolve(chunk);
@@ -78,6 +88,7 @@ namespace Latios.FlowFieldNavigation
                     var minCell = footprint.xy;
                     var maxCell = footprint.zw;
                     var radius = footprintSize / 2f;
+                    var radiusSq = radius * radius;
             
                     for (var x = minCell.x; x <= maxCell.x; x++)
                     {
@@ -88,15 +99,20 @@ namespace Latios.FlowFieldNavigation
                     
                             var cellCenter = Field.CellToWorld(cell);
                     
-                            var distance = math.distance(position.xz, cellCenter.xz);
-                            if (distance > radius) continue;
+                            var distanceSq = math.distancesq(position.xz, cellCenter.xz);
+                            if (distanceSq > radiusSq) continue;
 
-                            var normalizedDistance = distance / radius;
-                            var weight = densityData.MinWeight + (densityData.MaxWeight - densityData.MinWeight) * 
-                                math.pow(1 - normalizedDistance, densityData.Exponent);
+                            var normalizedDistance = distanceSq / radiusSq;
+                            var t = 1 - normalizedDistance;
+                            var weight = math.lerp(densityData.MinWeight, densityData.MaxWeight, t * t);
                     
                             var index = Field.CellToIndex(cell);
-                            DensityHashMap.Add(index, new float3(velocity * weight, weight));
+                            Stream.Write(new AgentInfluenceData
+                            {
+                                Index = index,
+                                Velocity = velocity,
+                                Weight = weight,
+                            }, threadIndex);
                         }
                     }
                 }
@@ -104,36 +120,34 @@ namespace Latios.FlowFieldNavigation
         }
 
         [BurstCompile]
-        internal struct AgentsPostProcessJob : IJobFor
+        internal struct AgentsPostProcessJob : IJob
         {
-            [ReadOnly] internal NativeParallelMultiHashMap<int, float3> DensityHashMap;
+            [ReadOnly] internal UnsafeParallelBlockList Stream;
             internal NativeArray<float> DensityMap;
             internal NativeArray<float2> MeanVelocityMap;
+            internal NativeArray<int> UnitsCountMap;
 
-            public void Execute(int index)
+            public void Execute()
             {
-                var densityEnumerator = DensityHashMap.GetValuesForKey(index);
-                var count = 0;
-                var totalWeight = 0f;
-                var totalVelocity = float2.zero;
-        
-                while (densityEnumerator.MoveNext())
+                for (int i = 0; i < DensityMap.Length; i++)
                 {
-                    var current = densityEnumerator.Current;
-                    totalWeight += current.z;
-                    totalVelocity += current.xy;
-                    count++;
+                    DensityMap[i] = 0;
+                    MeanVelocityMap[i] = 0;
+                    UnitsCountMap[i] = 0;
                 }
-
-                if (totalWeight <= 0f || count <= 1)
+                
+                var enumerator = Stream.GetEnumerator();
+                while (enumerator.MoveNext())
                 {
-                    DensityMap[index] = 0;
+                    var current = enumerator.GetCurrentAsRef<AgentInfluenceData>();
+                    var index = current.Index;
+                    var density = DensityMap[index] + current.Weight;
+                    var totalVelocity = MeanVelocityMap[index] + current.Velocity;
+                    var totalCount = UnitsCountMap[index] + 1;
+                    DensityMap[index] = math.min(density, FlowSettings.MaxDensity);
                     MeanVelocityMap[index] = totalVelocity;
-                    return;
+                    UnitsCountMap[index] = totalCount;
                 }
-
-                DensityMap[index] = math.min(totalWeight, FlowSettings.MaxDensity);
-                MeanVelocityMap[index] = totalVelocity / count;
             }
         }
     }

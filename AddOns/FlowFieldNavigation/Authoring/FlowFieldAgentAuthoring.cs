@@ -14,8 +14,6 @@ namespace Latios.FlowFieldNavigation.Hybrid
         public float MinDensity;
         [Range(0, FlowSettings.MaxDensity)]
         public float MaxDensity;
-        [Range(0, 10)]
-        public float Exponent;
 
         class Baker : Baker<FlowFieldAgentAuthoring>
         {
@@ -30,7 +28,6 @@ namespace Latios.FlowFieldNavigation.Hybrid
                 {
                     MinWeight = authoring.MinDensity,
                     MaxWeight = authoring.MaxDensity,
-                    Exponent = authoring.Exponent
                 });
             }
         }

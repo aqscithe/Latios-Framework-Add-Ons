@@ -24,7 +24,6 @@ namespace Latios.FlowFieldNavigation
         {
             public float MinWeight;
             public float MaxWeight;
-            public float Exponent;
         }
 
         public struct PrevPosition : IComponentData

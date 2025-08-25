@@ -127,7 +127,8 @@ namespace Latios.FlowFieldNavigation
         internal struct CalculateDirectionJob : IJobFor
         {
             [ReadOnly] internal NativeArray<float> CostField;
-            [ReadOnly] internal NativeArray<float> DensityField;
+            // [ReadOnly] internal NativeArray<float> DensityField;
+            [ReadOnly] internal Field Field;
             
             internal FlowSettings Settings;
             internal NativeArray<float2> DirectionMap;
@@ -146,7 +147,7 @@ namespace Latios.FlowFieldNavigation
                     return;
                 }
         
-                var current = currentCost + DensityField[index] * Settings.DensityInfluence;
+                var current = currentCost + Field.GetDensity(index) * Settings.DensityInfluence;
         
                 for (var dir = Grid.Direction.Up; dir <= Grid.Direction.Right; dir++)
                 {
@@ -155,7 +156,7 @@ namespace Latios.FlowFieldNavigation
                     var neighborIndex = Grid.CellToIndex(Width, neighbor);
                     var neighborCost = CostField[neighborIndex];
                     if (neighborCost > FlowSettings.PassabilityLimit) continue;
-                    var resultCost = neighborCost + DensityField[neighborIndex] * Settings.DensityInfluence;
+                    var resultCost = neighborCost + Field.GetDensity(index) * Settings.DensityInfluence;
         
                     var costDifference = resultCost - current;
                     var addGradient = costDifference * dir.ToVector();

@@ -7,6 +7,7 @@ namespace Latios.FlowFieldNavigation
     [BurstCompile]
     public static class FieldExtensions
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsValidCell(this Field field, int2 cell)
         {
             return Grid.IsValidCell(cell, field.Width, field.Height);
@@ -26,10 +27,17 @@ namespace Latios.FlowFieldNavigation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float GetSpeedFactor(this Field field, int index)
         {
-            var density = field.DensityMap[index];
+            var density = field.GetDensity(index);
             var velocity = field.MeanVelocityMap[index];
-            var speed = math.length(velocity);
+            var count = field.UnitsCountMap[index];
+            var speed = math.length(velocity / count);
             return math.lerp(1, math.saturate(speed), math.saturate(density / FlowSettings.MaxDensity));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float GetDensity(this Field field, int index)
+        {
+            return math.select(field.DensityMap[index], 0, field.UnitsCountMap[index] <= 1);
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -71,6 +79,7 @@ namespace Latios.FlowFieldNavigation
             return Grid.IsValidCell(cell, field.Width, field.Height);
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryWorldToFootprint(this Field field, float3 worldPosition, int footprintSize, out int4 footprint)
         {
             var localPos = worldPosition - field.Transform.Value.position;

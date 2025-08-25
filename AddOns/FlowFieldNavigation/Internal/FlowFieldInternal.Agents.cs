@@ -85,8 +85,8 @@ namespace Latios.FlowFieldNavigation
                     var speedFactor = field.GetSpeedFactor(index);
                     totalDirection += direction * speedFactor * weight;
                     totalWeight += weight;
-                    
-                    var density = field.DensityMap[index];
+
+                    var density = field.GetDensity(index);
                     maxDensity = math.max(maxDensity, density);
                     var toAgent = gridCoords - cellCenter;
                     totalGradient += toAgent * (density / FlowSettings.MaxDensity);
@@ -96,10 +96,9 @@ namespace Latios.FlowFieldNavigation
             if (totalWeight > 0)
             {
                 var flowDirection = totalDirection / totalWeight;
-                return flowDirection;
                 var flowLength = math.length(flowDirection);
 
-                var avoidanceDirection = math.normalizesafe(totalGradient);// / totalWeight);
+                var avoidanceDirection = math.normalizesafe(totalGradient);
                 var avoidanceStrength = math.saturate(maxDensity / FlowSettings.MaxDensity);
                 var blendedDirection = math.lerp(flowDirection, avoidanceDirection, avoidanceStrength);
 

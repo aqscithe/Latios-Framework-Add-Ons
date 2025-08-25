@@ -118,7 +118,7 @@ namespace Latios.FlowFieldNavigation
                 Settings = config.FlowSettings,
                 DirectionMap = flow.DirectionMap,
                 CostField = flow.Costs,
-                DensityField = config.Field.DensityMap,
+                Field = config.Field,
                 Width = config.Field.Width,
                 Height = config.Field.Height,
             }.ScheduleParallel(flow.DirectionMap.Length, 32, dependency);
@@ -148,7 +148,7 @@ namespace Latios.FlowFieldNavigation
                 Settings = flow.Settings,
                 DirectionMap = flow.DirectionMap,
                 CostField = flow.Costs,
-                DensityField = field.DensityMap,
+                Field = field,
                 Width = field.Width,
                 Height = field.Height,
             }.ScheduleParallel(flow.DirectionMap.Length, 32, dependency);
@@ -203,7 +203,7 @@ namespace Latios.FlowFieldNavigation
                 Settings = config.FlowSettings,
                 DirectionMap = flow.DirectionMap,
                 CostField = flow.Costs,
-                DensityField = config.Field.DensityMap,
+                Field = config.Field,
                 Width = config.Field.Width,
                 Height = config.Field.Height,
             }.Schedule(flow.DirectionMap.Length, dependency);
@@ -235,7 +235,7 @@ namespace Latios.FlowFieldNavigation
                 Settings = flow.Settings,
                 DirectionMap = flow.DirectionMap,
                 CostField = flow.Costs,
-                DensityField = field.DensityMap,
+                Field = field,
                 Width = field.Width,
                 Height = field.Height,
             }.Schedule(flow.DirectionMap.Length, dependency);

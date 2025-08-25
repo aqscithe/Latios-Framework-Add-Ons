@@ -2,9 +2,12 @@
 using System.Diagnostics;
 using Latios.Psyshock;
 using Latios.Transforms;
+using Latios.Unsafe;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
+using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
 using Physics = Latios.Psyshock.Physics;
 
@@ -188,25 +191,24 @@ namespace Latios.FlowFieldNavigation
         public static JobHandle ScheduleParallel(this BuildAgentsConfig config, in Field field, JobHandle inputDeps = default)
         {
             var dependency = inputDeps;
-            var agentsCount = config.AgentsQuery.CalculateEntityCount();
-            var capacity = agentsCount;
-            var densityHashMap = new NativeParallelMultiHashMap<int, float3>(capacity, Allocator.TempJob);
-
+            var stream = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<FlowFieldInternal.AgentInfluenceData>(), FlowSettings.MaxDensity * JobsUtility.JobWorkerCount, Allocator.TempJob);
+            
             dependency = new FlowFieldInternal.AgentsInfluenceJob
             {
-                DensityHashMap = densityHashMap,
+                Stream = stream,
                 Field = field,
-                TypeHandles = config.AgentTypeHandles
-            }.Schedule(config.AgentsQuery, dependency);
-
+                TypeHandles = config.AgentTypeHandles,
+            }.ScheduleParallel(config.AgentsQuery, dependency);
+            
             dependency = new FlowFieldInternal.AgentsPostProcessJob
             {
-                DensityHashMap = densityHashMap,
+                Stream = stream,
                 DensityMap = field.DensityMap,
                 MeanVelocityMap = field.MeanVelocityMap,
-            }.ScheduleParallel(field.DensityMap.Length, 32, dependency);
-
-            dependency = densityHashMap.Dispose(dependency);
+                UnitsCountMap = field.UnitsCountMap,
+            }.Schedule(dependency);
+            
+            dependency = stream.Dispose(dependency);
             return dependency;
         }
 
@@ -220,25 +222,24 @@ namespace Latios.FlowFieldNavigation
         public static JobHandle Schedule(this BuildAgentsConfig config, in Field field, JobHandle inputDeps = default)
         {
             var dependency = inputDeps;
-            var agentsCount = config.AgentsQuery.CalculateEntityCount();
-            var capacity = agentsCount * FlowSettings.MaxFootprintSize * FlowSettings.MaxFootprintSize;
-            var densityHashMap = new NativeParallelMultiHashMap<int, float3>(capacity, Allocator.TempJob);
+            var stream = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<FlowFieldInternal.AgentInfluenceData>(), FlowSettings.MaxDensity * JobsUtility.JobWorkerCount, Allocator.TempJob);
 
             dependency = new FlowFieldInternal.AgentsInfluenceJob
             {
-                DensityHashMap = densityHashMap,
+                Stream = stream,
                 Field = field,
                 TypeHandles = config.AgentTypeHandles,
             }.Schedule(config.AgentsQuery, dependency);
-
+            
             dependency = new FlowFieldInternal.AgentsPostProcessJob
             {
-                DensityHashMap = densityHashMap,
+                Stream = stream,
                 DensityMap = field.DensityMap,
                 MeanVelocityMap = field.MeanVelocityMap,
-            }.Schedule(field.DensityMap.Length, dependency);
-
-            dependency = densityHashMap.Dispose(dependency);
+                UnitsCountMap = field.UnitsCountMap,
+            }.Schedule(dependency);
+            
+            dependency = stream.Dispose(dependency);
             return dependency;
         }
 
