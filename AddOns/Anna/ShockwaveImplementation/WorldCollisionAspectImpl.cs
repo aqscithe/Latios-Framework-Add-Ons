@@ -75,6 +75,11 @@ namespace Latios.Shockwave
         {
             return Physics.ColliderCast(in colliderToCast, in castStart, castEnd, collisionWorld.collisionLayer, out result, out worldBodyInfo);
         }
+
+        private bool ColliderCastPrivate(in Collider colliderToCast, in TransformQvvs castStart, float3 castEnd, in Mask mask, out ColliderCastResult result, out LayerBodyInfo worldBodyInfo)
+        {
+            return Physics.ColliderCast(in colliderToCast, in castStart, castEnd, collisionWorld, in mask.mask, out result, out worldBodyInfo);
+        }
     }
 }
 

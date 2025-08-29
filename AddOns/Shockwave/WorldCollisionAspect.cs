@@ -127,6 +127,29 @@ namespace Latios.Shockwave
                                  out LayerBodyInfo layerBodyInfo) =>
                     ColliderCastPrivate(in colliderToCast, in castStart,  castEnd,  out result, out layerBodyInfo);
 
+
+        /// <summary>
+        /// Sweeps a collider beginning at castStart throught to castEnd and checks if the collider hits any other matching
+        /// entity collider in the CollisionWorld. If so, results of the hit in which the casted collider traveled the least
+        /// is reported. It is assumed that rotation, scale, and stretch remain constant throughout the operation. Hits where
+        /// the casted collider starts already overlapping a target in the CollisionWorld are ignored.
+        /// </summary>
+        /// <param name="colliderToCast">The casted collider that should be swept through space</param>
+        /// <param name="castStart">The transform of the casted collider at the start of the cast</param>
+        /// <param name="castEnd">The position of the casted collider at the end of the cast range</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="result">The resulting information about the least-swept hit if there is one. If there
+        /// is no hit, the contents of the result are undefined.</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>True if a hit was found, false otherwise</returns>
+        public bool ColliderCast(in Collider colliderToCast,
+                                 in TransformQvvs castStart,
+                                 float3 castEnd,
+                                 in Mask mask,
+                                 out ColliderCastResult result,
+                                 out LayerBodyInfo worldBodyInfo) =>
+                    ColliderCastPrivate(in colliderToCast, castStart, castEnd, in mask, out result, out worldBodyInfo);
+
         #endregion
 
     }
