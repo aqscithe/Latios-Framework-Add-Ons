@@ -1,4 +1,4 @@
-# Latios Framework Add-Ons [0.4.1]
+# Latios Framework Add-Ons [0.5.0]
 
 This is an extra Unity package for the Latios Framework containing various
 add-on modules and functionality.
@@ -35,7 +35,9 @@ how to contribute your own add-ons or improve existing add-ons.
 
 ### Physics
 
--   Anna – A rigid body physics engine focused on ease-of-use
+-   Anna (DreamingImLatios) – A rigid body physics engine focused on ease-of-use
+-   Shockwave (DreamingImLatios) – A unified API that other add-ons may use such
+    that they will be compatible with any physics engine supporting Shockwave
 
 ### Animation
 
@@ -65,4 +67,5 @@ how to contribute your own add-ons or improve existing add-ons.
 -   clandais – Primary author of Navigator
 -   Alejandro Nunez – Primary co-author of Mecanim V2
 -   Sovogal – Primary author of Mecanim V1
+-   aqscithe – Contributor to Anna and Psyshock
 -   Obrazy – Contributor to Anna

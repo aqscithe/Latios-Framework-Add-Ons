@@ -21,7 +21,7 @@ provides an API for feeding constraints directly to the solver.
 
 **Main Author(s):** Dreaming I’m Latios
 
-**Additional Contributors:** Obrazy
+**Additional Contributors:** Obrazy, aqscithe
 
 **Support:** Please make feature requests for features you would like to see
 added! You can use any of the Latios Framework support channels to make

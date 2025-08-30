@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-8-30
+
+### Changed
+
+-   Updated Anna to v0.2.2
+-   Updated Shockwave to v0.2.0
+
 ## [0.4.1] - 2025-8-9
 
 ### Changed
