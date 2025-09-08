@@ -63,6 +63,7 @@ namespace Latios.Anna.Systems
                 inertiaOverrideHandle = GetComponentTypeHandle<LocalInertiaOverride>(true),
                 physicsSettings       = physicsSettings,
                 rigidBodyHandle       = GetComponentTypeHandle<RigidBody>(false),
+                customGravityHandle   = GetComponentTypeHandle<CustomGravity>(true),
                 startIndices          = startIndices,
                 states                = states,
                 transformHandle       = GetComponentTypeHandle<WorldTransform>(true)
@@ -84,6 +85,7 @@ namespace Latios.Anna.Systems
             [ReadOnly] public ComponentTypeHandle<Collider>                  colliderHandle;
             [ReadOnly] public ComponentTypeHandle<LocalCenterOfMassOverride> centerOverrideHandle;
             [ReadOnly] public ComponentTypeHandle<LocalInertiaOverride>      inertiaOverrideHandle;
+            [ReadOnly] public ComponentTypeHandle<CustomGravity>             customGravityHandle;
             [ReadOnly] public NativeArray<int>                               startIndices;
 
             public ComponentTypeHandle<RigidBody>          rigidBodyHandle;
@@ -104,6 +106,7 @@ namespace Latios.Anna.Systems
                 var colliders        = chunk.GetComponentDataPtrRO(ref colliderHandle);
                 var centerOverrides  = chunk.GetComponentDataPtrRO(ref centerOverrideHandle);
                 var inertiaOverrides = chunk.GetComponentDataPtrRO(ref inertiaOverrideHandle);
+                var customGravities  = chunk.GetComponentDataPtrRO(ref customGravityHandle);
                 var rigidBodies      = (RigidBody*)chunk.GetRequiredComponentDataPtrRW(ref rigidBodyHandle);
                 var impulses         = chunk.GetBufferAccessor(ref addImpulseHandle);
                 var aabbs            = (Aabb*)chunk.GetComponentDataPtrRW(ref aabbHandle);
@@ -128,7 +131,23 @@ namespace Latios.Anna.Systems
                                                        out var mass,
                                                        out var inertialPoseWorldTransform);
 
-                    rigidBody.velocity.linear += physicsSettings.gravity * dt;
+                    float3 effectiveGravity = physicsSettings.gravity;
+
+                    if(customGravities != null)
+                    {
+                        if(customGravities[i].useGravityOverride)
+                        {
+                            effectiveGravity = customGravities[i].gravityOverride;
+                        }
+
+                        if(customGravities[i].useGravityScaling)
+                        {
+                            effectiveGravity *= customGravities[i].gravityScale;
+                        }
+                    }
+                    
+                    rigidBody.velocity.linear += effectiveGravity * dt;
+
                     if (impulses.Length > 0)
                     {
                         foreach (var impulse in impulses[i])
@@ -157,7 +176,7 @@ namespace Latios.Anna.Systems
                         bucketIndex                        = bucketIndex,
                         coefficientOfFriction              = rigidBody.coefficientOfFriction,
                         coefficientOfRestitution           = rigidBody.coefficientOfRestitution,
-                        gravity                            = physicsSettings.gravity,
+                        gravity                            = effectiveGravity,
                         inertialPoseWorldTransform         = inertialPoseWorldTransform,
                         linearDamping                      = physicsSettings.linearDamping,
                         mass                               = mass,

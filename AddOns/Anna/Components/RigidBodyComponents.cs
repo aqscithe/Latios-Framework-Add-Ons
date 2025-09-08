@@ -12,6 +12,14 @@ namespace Latios.Anna
         public half              coefficientOfRestitution;
     }
 
+    public struct CustomGravity : IComponentData
+    {
+        public bool useGravityScaling;
+        public bool useGravityOverride;
+        public float gravityScale;
+        public float3 gravityOverride;
+    }
+
     [InternalBufferCapacity(0)]
     public struct AddImpulse : IBufferElementData
     {

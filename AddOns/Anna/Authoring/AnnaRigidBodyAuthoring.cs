@@ -23,6 +23,22 @@ namespace Latios.Anna.Authoring
 
         [Header("Features")]
         public bool supportExternalForces = true;
+
+        [Tooltip("Enables the custom gravity properties below")]
+        public bool supportCustomGravity  = true;
+
+        [Header("Custom Gravity Properties")]
+
+        [Tooltip("Override Anna physics settings gravity")]
+        public bool   useGravityOverride = false;
+
+        [Tooltip("Scales Anna physics settings gravity | Scales override instead if enabled")]
+        public bool   useGravityScaling  = false;
+
+        public float3 gravityOverride    = new float3(0f, -9.81f, 0f);
+        public float  gravityScale       = 1f;
+
+
     }
 
     public class AnnaRigidBodyAuthoringBaker : Baker<AnnaRigidBodyAuthoring>
@@ -54,7 +70,17 @@ namespace Latios.Anna.Authoring
             {
                 AddBuffer<AddImpulse>(entity);
             }
+            if (authoring.supportCustomGravity)
+            {
+                AddComponent(entity, new CustomGravity {
+                    useGravityScaling = authoring.useGravityScaling,
+                    useGravityOverride = authoring.useGravityOverride,
+                    gravityScale = authoring.gravityScale,
+                    gravityOverride = authoring.gravityOverride
+                });
+            }
         }
     }
+
 }
 
