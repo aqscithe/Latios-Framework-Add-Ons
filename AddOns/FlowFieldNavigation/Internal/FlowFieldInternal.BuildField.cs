@@ -36,11 +36,13 @@ namespace Latios.FlowFieldNavigation
             }
         }
 
+        [BurstCompile]
         internal struct ObstaclesProcessor : IFindPairsProcessor
         {
             [NativeDisableParallelForRestriction]
             internal Field Field;
 
+            [BurstCompile]
             public void Execute(in FindPairsResult result)
             {
                 if (!Physics.DistanceBetween(result.colliderA, result.transformA, result.colliderB, result.transformB, 0.001f, out _))
@@ -64,9 +66,9 @@ namespace Latios.FlowFieldNavigation
             [ReadOnly] internal Field Field;
             [ReadOnly] internal FlowFieldAgentsTypeHandles TypeHandles;
             internal UnsafeParallelBlockList Stream;
-            
+
             [NativeSetThreadIndex] int threadIndex;
-            
+
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var chunkTransforms = TypeHandles.WorldTransform.Resolve(chunk);
@@ -82,38 +84,36 @@ namespace Latios.FlowFieldNavigation
                     var footprintSize = chunkFootprints[i].Size;
                     var velocity = chunkVelocities[i].Value;
                     var densityData = chunkDensities[i];
-                    
+
                     if (!Field.TryWorldToFootprint(position, footprintSize, out var footprint)) continue;
-                    
+
                     var minCell = footprint.xy;
                     var maxCell = footprint.zw;
                     var radius = footprintSize / 2f;
                     var radiusSq = radius * radius;
-            
-                    for (var x = minCell.x; x <= maxCell.x; x++)
-                    {
-                        for (var y = minCell.y; y <= maxCell.y; y++)
-                        {
-                            var cell = new int2(x, y);
-                            if (!Field.IsValidCell(cell)) continue;
-                    
-                            var cellCenter = Field.CellToWorld(cell);
-                    
-                            var distanceSq = math.distancesq(position.xz, cellCenter.xz);
-                            if (distanceSq > radiusSq) continue;
 
-                            var normalizedDistance = distanceSq / radiusSq;
-                            var t = 1 - normalizedDistance;
-                            var weight = math.lerp(densityData.MinWeight, densityData.MaxWeight, t * t);
-                    
-                            var index = Field.CellToIndex(cell);
-                            Stream.Write(new AgentInfluenceData
-                            {
-                                Index = index,
-                                Velocity = velocity,
-                                Weight = weight,
-                            }, threadIndex);
-                        }
+                    for (var x = minCell.x; x <= maxCell.x; x++)
+                    for (var y = minCell.y; y <= maxCell.y; y++)
+                    {
+                        var cell = new int2(x, y);
+                        if (!Field.IsValidCell(cell)) continue;
+
+                        var cellCenter = Field.CellToWorld(cell);
+
+                        var distanceSq = math.distancesq(position.xz, cellCenter.xz);
+                        if (distanceSq > radiusSq) continue;
+
+                        var normalizedDistance = distanceSq / radiusSq;
+                        var t = 1 - normalizedDistance;
+                        var weight = math.lerp(densityData.MinWeight, densityData.MaxWeight, t * t);
+
+                        var index = Field.CellToIndex(cell);
+                        Stream.Write(new AgentInfluenceData
+                        {
+                            Index = index,
+                            Velocity = velocity,
+                            Weight = weight,
+                        }, threadIndex);
                     }
                 }
             }
@@ -135,7 +135,7 @@ namespace Latios.FlowFieldNavigation
                     MeanVelocityMap[i] = 0;
                     UnitsCountMap[i] = 0;
                 }
-                
+
                 var enumerator = Stream.GetEnumerator();
                 while (enumerator.MoveNext())
                 {

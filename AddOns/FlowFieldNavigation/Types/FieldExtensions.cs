@@ -80,7 +80,7 @@ namespace Latios.FlowFieldNavigation
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool TryWorldToFootprint(this Field field, float3 worldPosition, int footprintSize, out int4 footprint)
+        public static bool TryWorldToFootprint(this Field field, float3 worldPosition, int2 footprintSize, out int4 footprint)
         {
             var localPos = worldPosition - field.Transform.Value.position;
             var invRotation = math.inverse(field.Transform.Value.rotation);
@@ -94,12 +94,11 @@ namespace Latios.FlowFieldNavigation
 
             var centerOffset = math.select(0f, 0.5f, footprintSize % 2 == 0);
             var centerCell = (int2)math.floor(gridCoords + centerOffset);
-            var halfSize = footprintSize / 2;
     
-            var minX = centerCell.x - halfSize;
-            var minY = centerCell.y - halfSize;
-            var maxX = minX + footprintSize - 1;
-            var maxY = minY + footprintSize - 1;
+            var minX = centerCell.x - footprintSize.x / 2;
+            var minY = centerCell.y - footprintSize.y / 2;
+            var maxX = minX + footprintSize.x - 1;
+            var maxY = minY + footprintSize.y - 1;
 
             if (minX >= field.Width || maxX < 0 || minY >= field.Height || maxY < 0)
             {

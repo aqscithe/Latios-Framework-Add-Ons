@@ -40,7 +40,7 @@ namespace Latios.FlowFieldNavigation
                 if (Field.GetDensity(index) > 0)
                 {
                     offset = new float3(0, 0.15f, 0);
-                    color = Color.Lerp(Color.white, Color.blue, Field.GetDensity(index));
+                    color = Color.Lerp(Color.white, Color.blue, Field.GetDensity(index) / FlowSettings.MaxDensity);
                 }
                 
                 DrawCell(Field, Flow, index, offset, color);
@@ -68,10 +68,10 @@ namespace Latios.FlowFieldNavigation
             var leftTopBack      = math.transform(transform, new float3(aabb.min.x, aabb.max.y, aabb.max.z));
             var rightTopBack     = math.transform(transform, new float3(aabb.max.x, aabb.max.y, aabb.max.z));
 
-            Debug.DrawLine(leftTopFront,     rightTopFront,    color);
-            Debug.DrawLine(leftTopBack,      rightTopBack,     color);
-            Debug.DrawLine(leftTopFront,     leftTopBack,      color);
-            Debug.DrawLine(rightTopFront,    rightTopBack,     color);
+            // Debug.DrawLine(leftTopFront,     rightTopFront,    color);
+            // Debug.DrawLine(leftTopBack,      rightTopBack,     color);
+            // Debug.DrawLine(leftTopFront,     leftTopBack,      color);
+            // Debug.DrawLine(rightTopFront,    rightTopBack,     color);
 
             var direction = flow.GetDirection(index);
             if (direction.x != 0 || direction.y != 0)

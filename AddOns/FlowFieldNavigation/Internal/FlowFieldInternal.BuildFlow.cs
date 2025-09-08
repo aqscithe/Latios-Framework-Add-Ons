@@ -2,6 +2,7 @@
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -16,7 +17,7 @@ namespace Latios.FlowFieldNavigation
             [ReadOnly] internal Field Field;
             [ReadOnly] internal FlowGoalTypeHandles TypeHandles;
 
-            internal NativeList<int2>.ParallelWriter GoalCells;
+            internal NativeHashSet<int2> GoalCells;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -28,66 +29,62 @@ namespace Latios.FlowFieldNavigation
                 while (enumerator.NextEntityIndex(out var i))
                 {
                     var position = chunkTransforms[i].position;
-                    var footprintSize = chunkGoals[i].FootprintSize;
+                    var footprintSize = chunkGoals[i].Size;
 
                     if (!Field.TryWorldToFootprint(position, footprintSize, out var footprint)) continue;
-                    
+
                     var minCell = footprint.xy;
                     var maxCell = footprint.zw;
-                    
+
                     for (var x = minCell.x; x <= maxCell.x; x++)
+                    for (var y = minCell.y; y <= maxCell.y; y++)
                     {
-                        for (var y = minCell.y; y <= maxCell.y; y++)
-                        {
-                            var cell = new int2(x, y);
-                            if (!Field.IsValidCell(cell)) continue;
-                            GoalCells.AddNoResize(cell);
-                        }
+                        var cell = new int2(x, y);
+                        if (!Field.IsValidCell(cell)) continue;
+                        GoalCells.Add(cell);
                     }
                 }
             }
         }
-        
+
         [BurstCompile]
         internal struct CalculateCostsWithPriorityQueueJob : IJob
         {
-            internal const float HeapCapacityFactor = 0.35f;
-            
-            [ReadOnly] internal Field Field;
-            [ReadOnly] internal NativeList<int2> GoalCells;
-            
+            const float HeapCapacityFactor = 0.35f;
+
+            [ReadOnly] internal NativeArray<int> PassabilityMap;
+            [ReadOnly] internal NativeHashSet<int2> GoalCells;
+            internal int Width, Height;
+
             internal NativeArray<float> Costs;
 
             public void Execute()
             {
-                int width = Field.Width;
-                int height = Field.Height;
-
                 for (var i = 0; i < Costs.Length; i++) Costs[i] = FlowSettings.PassabilityLimit + 1;
-                int initialHeapCapacity = math.max(64, (int)(width * height * HeapCapacityFactor));
+                int initialHeapCapacity = math.max(64, (int)(Width * Height * HeapCapacityFactor));
                 var queue = new NativePriorityQueue<CostEntry, CostComparer>(initialHeapCapacity, Allocator.Temp);
-                var visited = new NativeBitArray(width * height, Allocator.Temp);
-                
+                var visited = new NativeBitArray(Width * Height, Allocator.Temp);
+
                 foreach (var goal in GoalCells)
                 {
                     queue.Enqueue(new(goal, 0));
-                    Costs[Grid.CellToIndex(width, goal)] = 0;
+                    Costs[Grid.CellToIndex(Width, goal)] = 0;
                 }
-                
+
                 while (queue.TryDequeue(out var current))
                 {
-                    var currentCost = Costs[Grid.CellToIndex(width, current.Pos)];
+                    var currentCost = Costs[Grid.CellToIndex(Width, current.Pos)];
 
                     for (var dir = Grid.Direction.Up; dir <= Grid.Direction.DownRight; dir++)
                     {
-                        if (!Grid.TryGetNeighborCell(width, height, current.Pos, dir, out var neighbor)) continue;
+                        if (!Grid.TryGetNeighborCell(Width, Height, current.Pos, dir, out var neighbor)) continue;
 
-                        var neighborIndex = Grid.CellToIndex(width, neighbor);
+                        var neighborIndex = Grid.CellToIndex(Width, neighbor);
                         if (visited.IsSet(neighborIndex)) continue;
 
-                        if (Field.PassabilityMap[neighborIndex] < 0) continue;
+                        if (PassabilityMap[neighborIndex] < 0) continue;
 
-                        var moveCost = Field.PassabilityMap[neighborIndex] + (dir > Grid.Direction.Right ? math.SQRT2 : 1);
+                        var moveCost = PassabilityMap[neighborIndex] + (dir > Grid.Direction.Right ? math.SQRT2 : 1);
 
                         var newCost = currentCost + moveCost;
 
@@ -103,23 +100,43 @@ namespace Latios.FlowFieldNavigation
                 queue.Dispose();
                 visited.Dispose();
             }
+        }
 
-            struct CostComparer : IComparer<CostEntry>
+        [BurstCompile]
+        internal struct ResetJob : IJob
+        {
+            internal NativeArray<float> Costs;
+            internal NativeHashSet<int2> GoalCells;
+            internal int Width, Height;
+
+            public void Execute()
             {
-                public int Compare(CostEntry x,
-                    CostEntry y) => x.Cost.CompareTo(y.Cost);
-            }
-
-            readonly struct CostEntry
-            {
-                public readonly float Cost;
-                public readonly int2 Pos;
-
-                public CostEntry(int2 pos, float cost)
+                for (var index = 0; index < Costs.Length; index++)
                 {
-                    Pos = pos;
-                    Cost = cost;
+                    Costs[index] = FlowSettings.PassabilityLimit + 1;
                 }
+
+                foreach (var goal in GoalCells)
+                {
+                    Costs[Grid.CellToIndex(Width, goal)] = 0;
+                }
+            }
+        }
+
+        internal struct CostComparer : IComparer<CostEntry>
+        {
+            public int Compare(CostEntry x, CostEntry y) => x.Cost.CompareTo(y.Cost);
+        }
+
+        internal readonly struct CostEntry
+        {
+            public readonly float Cost;
+            public readonly int2 Pos;
+
+            public CostEntry(int2 pos, float cost)
+            {
+                Pos = pos;
+                Cost = cost;
             }
         }
 
@@ -127,42 +144,42 @@ namespace Latios.FlowFieldNavigation
         internal struct CalculateDirectionJob : IJobFor
         {
             [ReadOnly] internal NativeArray<float> CostField;
-            // [ReadOnly] internal NativeArray<float> DensityField;
+            [ReadOnly] internal NativeArray<float> DensityField;
             [ReadOnly] internal Field Field;
-            
+
             internal FlowSettings Settings;
             internal NativeArray<float2> DirectionMap;
             internal int Width;
             internal int Height;
-        
+
             public void Execute(int index)
             {
                 var cell = Grid.IndexToCell(index, Width);
                 var gradient = float2.zero;
                 var currentCost = CostField[index];
-        
+
                 if (currentCost <= 0)
                 {
                     DirectionMap[index] = float2.zero;
                     return;
                 }
-        
-                var current = currentCost + Field.GetDensity(index) * Settings.DensityInfluence;
-        
+
+                var current = currentCost + DensityField[index] * Settings.DensityInfluence;
+
                 for (var dir = Grid.Direction.Up; dir <= Grid.Direction.Right; dir++)
                 {
                     if (!Grid.TryGetNeighborCell(Width, Height, cell, dir, out var neighbor)) continue;
-        
+
                     var neighborIndex = Grid.CellToIndex(Width, neighbor);
                     var neighborCost = CostField[neighborIndex];
                     if (neighborCost > FlowSettings.PassabilityLimit) continue;
-                    var resultCost = neighborCost + Field.GetDensity(index) * Settings.DensityInfluence;
-        
+                    var resultCost = neighborCost + DensityField[index] * Settings.DensityInfluence;
+
                     var costDifference = resultCost - current;
                     var addGradient = costDifference * dir.ToVector();
                     gradient += addGradient;
                 }
-        
+
                 DirectionMap[index] = math.normalizesafe(-gradient);
             }
         }

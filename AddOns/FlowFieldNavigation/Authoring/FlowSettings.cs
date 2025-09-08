@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Latios.FlowFieldNavigation
@@ -12,6 +13,9 @@ namespace Latios.FlowFieldNavigation
 
         [Range(0, 10)]
         public float DensityInfluence;
+
+        public int2 ClusterSize;
+        public int Iterations;
 
         public static FlowSettings Default => new()
         {

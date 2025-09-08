@@ -7,7 +7,7 @@ namespace Latios.FlowFieldNavigation
     {
         public struct Goal : IComponentData
         {
-            public int FootprintSize;
+            public int2 Size;
         }
 
         public struct AgentDirection : IComponentData
