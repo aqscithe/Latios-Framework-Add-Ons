@@ -25,18 +25,11 @@ namespace Latios.Anna.Authoring
         public bool supportExternalForces = true;
 
         [Tooltip("Enables the custom gravity properties below")]
-        public bool supportCustomGravity  = true;
+        public bool supportCustomGravity  = false;
 
         [Header("Custom Gravity Properties")]
-
-        [Tooltip("Override Anna physics settings gravity")]
-        public bool   useGravityOverride = false;
-
-        [Tooltip("Scales Anna physics settings gravity | Scales override instead if enabled")]
-        public bool   useGravityScaling  = false;
-
         public float3 gravityOverride    = new float3(0f, -9.81f, 0f);
-        public float  gravityScale       = 1f;
+        public float3 gravityScale       = new float3(0f, 1f, 0f);
 
 
     }
@@ -72,11 +65,9 @@ namespace Latios.Anna.Authoring
             }
             if (authoring.supportCustomGravity)
             {
-                AddComponent(entity, new CustomGravity {
-                    useGravityScaling = authoring.useGravityScaling,
-                    useGravityOverride = authoring.useGravityOverride,
-                    gravityScale = authoring.gravityScale,
-                    gravityOverride = authoring.gravityOverride
+                AddComponent(entity, new GravityOverride {
+                    scale = authoring.gravityScale,
+                    gravity = authoring.gravityOverride
                 });
             }
         }
