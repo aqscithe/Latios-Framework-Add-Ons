@@ -132,7 +132,7 @@ namespace Latios.Anna.Systems
                                                        out var inertialPoseWorldTransform);
 
 
-                    float3 gravity = gravityOverrides == null ? physicsSettings.gravity : gravityOverrides[i].gravity * gravityOverrides[i].scale;
+                    float3 gravity = gravityOverrides == null ? physicsSettings.gravity : gravityOverrides[i].gravity;
                     
                     rigidBody.velocity.linear += gravity * dt;
 

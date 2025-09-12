@@ -53,6 +53,5 @@ namespace Latios.Anna
     public struct GravityOverride : IComponentData
     {
         public float3 gravity;
-        public float3 scale;
     }
 }

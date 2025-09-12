@@ -29,9 +29,6 @@ namespace Latios.Anna.Authoring
 
         [Header("Custom Gravity Properties")]
         public float3 gravityOverride    = new float3(0f, -9.81f, 0f);
-        public float3 gravityScale       = new float3(0f, 1f, 0f);
-
-
     }
 
     public class AnnaRigidBodyAuthoringBaker : Baker<AnnaRigidBodyAuthoring>
@@ -66,7 +63,6 @@ namespace Latios.Anna.Authoring
             if (authoring.supportCustomGravity)
             {
                 AddComponent(entity, new GravityOverride {
-                    scale = authoring.gravityScale,
                     gravity = authoring.gravityOverride
                 });
             }
