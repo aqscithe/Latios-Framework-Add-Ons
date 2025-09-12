@@ -89,10 +89,6 @@ namespace Latios.FlowFieldNavigation
         /// </remarks>
         public static JobHandle ScheduleParallel(this BuildFlowConfig config, out Flow flow, AllocatorManager.AllocatorHandle allocator, JobHandle inputDeps = default)
         {
-            if (config.FlowSettings.Iterations > 1)
-            {
-                return ScheduleParallelByChunk(config, out flow, allocator, inputDeps);
-            }
             config.ValidateSettings();
 
             flow = new Flow(config.Field, config.FlowSettings, allocator);
@@ -106,12 +102,19 @@ namespace Latios.FlowFieldNavigation
                 TypeHandles = config.TypeHandles
             }.Schedule(config.GoalsQuery, dependency);
             
-            dependency = new FlowFieldInternal.CalculateCostsWithPriorityQueueJob
+            dependency = new FlowFieldInternal.ResetJob
+            {
+                Costs = flow.Costs,
+                GoalCells = flow.GoalCells,
+                Width = config.Field.Width
+            }.Schedule(dependency);
+            
+            dependency = new FlowFieldInternal.CalculateCostsWavefrontJob
             {
                 PassabilityMap = config.Field.PassabilityMap,
                 Width = config.Field.Width, Height = config.Field.Height,
-                Costs = flow.Costs,
-                GoalCells = flow.GoalCells
+                Costs = flow.Costs, 
+                GoalCells = flow.GoalCells,
             }.Schedule(dependency);
             
             dependency = new FlowFieldInternal.CalculateDirectionJob
@@ -120,7 +123,6 @@ namespace Latios.FlowFieldNavigation
                 DirectionMap = flow.DirectionMap,
                 CostField = flow.Costs,
                 DensityField = config.Field.DensityMap,
-                Field = config.Field,
                 Width = config.Field.Width,
                 Height = config.Field.Height,
             }.ScheduleParallel(flow.DirectionMap.Length, 32, dependency);
@@ -151,7 +153,6 @@ namespace Latios.FlowFieldNavigation
                 DirectionMap = flow.DirectionMap,
                 CostField = flow.Costs,
                 DensityField = field.DensityMap,
-                Field = field,
                 Width = field.Width,
                 Height = field.Height,
             }.ScheduleParallel(flow.DirectionMap.Length, 32, dependency);
@@ -194,7 +195,7 @@ namespace Latios.FlowFieldNavigation
                 TypeHandles = config.TypeHandles
             }.Schedule(config.GoalsQuery, dependency);
 
-            dependency = new FlowFieldInternal.CalculateCostsWithPriorityQueueJob
+            dependency = new FlowFieldInternal.CalculateCostsWavefrontJob
             {
                 PassabilityMap = config.Field.PassabilityMap,
                 Width = config.Field.Width, Height = config.Field.Height,
@@ -207,7 +208,6 @@ namespace Latios.FlowFieldNavigation
                 Settings = config.FlowSettings,
                 DirectionMap = flow.DirectionMap,
                 CostField = flow.Costs,
-                Field = config.Field,
                 Width = config.Field.Width,
                 Height = config.Field.Height,
             }.Schedule(flow.DirectionMap.Length, dependency);
@@ -239,7 +239,6 @@ namespace Latios.FlowFieldNavigation
                 Settings = flow.Settings,
                 DirectionMap = flow.DirectionMap,
                 CostField = flow.Costs,
-                Field = field,
                 Width = field.Width,
                 Height = field.Height,
             }.Schedule(flow.DirectionMap.Length, dependency);

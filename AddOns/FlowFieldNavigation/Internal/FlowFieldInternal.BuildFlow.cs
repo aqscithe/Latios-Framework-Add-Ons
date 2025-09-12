@@ -101,6 +101,65 @@ namespace Latios.FlowFieldNavigation
                 visited.Dispose();
             }
         }
+        
+        [BurstCompile]
+        internal struct CalculateCostsWavefrontJob : IJob
+        {
+            [ReadOnly] internal NativeArray<int> PassabilityMap;
+            [ReadOnly] internal NativeHashSet<int2> GoalCells;
+            internal int Width, Height;
+
+            [NativeDisableContainerSafetyRestriction]
+            internal NativeArray<float> Costs;
+
+            public void Execute()
+            {
+                var wave = new NativeList<int2>(GoalCells.Count, Allocator.Temp);
+
+                foreach (var goal in GoalCells)
+                {
+                    wave.Add(goal);
+                }
+
+                var nextWave = new NativeList<int2>(wave.Capacity, Allocator.Temp);
+
+                while (wave.Length > 0)
+                {
+                    for (var i = 0; i < wave.Length; i++)
+                    {
+                        var cell = wave[i];
+                        var cellIndex = Grid.CellToIndex(Width, cell);
+                        
+                        var currentCost = Costs[cellIndex];
+
+                        for (var dir = Grid.Direction.Up; dir <= Grid.Direction.DownRight; dir++)
+                        {
+                            if (!Grid.TryGetNeighborCell(Width, Height, cell, dir, out var neighbor)) continue;
+
+                            var neighborIndex = Grid.CellToIndex(Width, neighbor);
+                            var passability = PassabilityMap[neighborIndex];
+
+                            if (passability < 0 || passability >= FlowSettings.PassabilityLimit) continue;
+
+                            var moveCost = passability + (dir > Grid.Direction.Right ? math.SQRT2 : 1f);
+                            var newCost = currentCost + moveCost;
+
+                            if (newCost < Costs[neighborIndex])
+                            {
+                                Costs[neighborIndex] = newCost;
+                                nextWave.Add(neighbor);
+                            }
+                        }
+                    }
+
+                    (wave, nextWave) = (nextWave, wave);
+                    nextWave.Clear();
+                }
+
+                wave.Dispose();
+                nextWave.Dispose();
+            }
+        }
 
         [BurstCompile]
         internal struct ResetJob : IJob
@@ -145,7 +204,6 @@ namespace Latios.FlowFieldNavigation
         {
             [ReadOnly] internal NativeArray<float> CostField;
             [ReadOnly] internal NativeArray<float> DensityField;
-            [ReadOnly] internal Field Field;
 
             internal FlowSettings Settings;
             internal NativeArray<float2> DirectionMap;
