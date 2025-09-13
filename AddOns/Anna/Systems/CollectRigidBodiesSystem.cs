@@ -169,7 +169,7 @@ namespace Latios.Anna.Systems
                         linearDamping                      = physicsSettings.linearDamping,
                         mass                               = mass,
                         motionExpansion                    = motionExpansion,
-                        motionStabilizer                   = UnitySim.MotionStabilizer.kDefault,
+                        motionStabilizer                   = new UnitySim.MotionStabilizer(in rigidBody.velocity),
                         numOtherSignificantBodiesInContact = 0,
                         velocity                           = rigidBody.velocity
                     };

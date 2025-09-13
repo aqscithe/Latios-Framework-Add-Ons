@@ -15,8 +15,8 @@ namespace Latios.Smoothie
         ApplyBlendResultsJob m_applyBlendResultsJob;
 
         public BlendScheduler(ref SystemState state,
-                              FixedList512Bytes<TypeIndex> inputComponentTypes,
-                              FixedList512Bytes<TypeIndex> outputComponentTypes,
+                              in FixedList512Bytes<TypeIndex> inputComponentTypes,
+                              in FixedList512Bytes<TypeIndex> outputComponentTypes,
                               bool enableAliasing = false)
         {
             var inputBuilder = new ComponentBrokerBuilder(Allocator.Temp).With<BlendInstructions, Duration>(true)
