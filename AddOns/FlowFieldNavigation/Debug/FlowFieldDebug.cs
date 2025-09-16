@@ -49,24 +49,24 @@ namespace Latios.FlowFieldNavigation
         
         public static void DrawCell(in Field field, in Flow flow, int index, float3 offset, Color color)
         {
-            var body = field.CellColliders[index];
+            var body = field.TransformsMap[index];
             
-            var c = body.collider;
-            Physics.ScaleStretchCollider(ref c, body.transform.scale, body.transform.stretch);
-            
-            var transform = new RigidTransform(
-                body.transform.rotation,
-                body.transform.position + offset
-            );
-            
-            BoxCollider box = c;
-            
-            var aabb = new Aabb( box.center - box.halfSize,  box.center + box.halfSize);
-
-            var leftTopFront     = math.transform(transform, new float3(aabb.min.x, aabb.max.y, aabb.min.z));
-            var rightTopFront    = math.transform(transform, new float3(aabb.max.x, aabb.max.y, aabb.min.z));
-            var leftTopBack      = math.transform(transform, new float3(aabb.min.x, aabb.max.y, aabb.max.z));
-            var rightTopBack     = math.transform(transform, new float3(aabb.max.x, aabb.max.y, aabb.max.z));
+            // var c = body.collider;
+            // Physics.ScaleStretchCollider(ref c, body.transform.scale, body.transform.stretch);
+            //
+            // var transform = new RigidTransform(
+            //     body.transform.rotation,
+            //     body.transform.position + offset
+            // );
+            //
+            // BoxCollider box = c;
+            //
+            // var aabb = new Aabb( box.center - box.halfSize,  box.center + box.halfSize);
+            //
+            // var leftTopFront     = math.transform(transform, new float3(aabb.min.x, aabb.max.y, aabb.min.z));
+            // var rightTopFront    = math.transform(transform, new float3(aabb.max.x, aabb.max.y, aabb.min.z));
+            // var leftTopBack      = math.transform(transform, new float3(aabb.min.x, aabb.max.y, aabb.max.z));
+            // var rightTopBack     = math.transform(transform, new float3(aabb.max.x, aabb.max.y, aabb.max.z));
 
             // Debug.DrawLine(leftTopFront,     rightTopFront,    color);
             // Debug.DrawLine(leftTopBack,      rightTopBack,     color);
@@ -76,7 +76,7 @@ namespace Latios.FlowFieldNavigation
             var direction = flow.GetDirection(index);
             if (direction.x != 0 || direction.y != 0)
             {
-                Debug.DrawRay(body.transform.position + offset, direction.x0y()/2f, Color.yellow);
+                Debug.DrawRay(body.position + offset, direction.x0y()/2f, Color.yellow);
             }
         }
     }

@@ -1,5 +1,8 @@
 ﻿using System.Runtime.CompilerServices;
+using Latios.Psyshock;
+using Latios.Transforms;
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Mathematics;
 
 namespace Latios.FlowFieldNavigation
@@ -45,6 +48,12 @@ namespace Latios.FlowFieldNavigation
         {
             return new float3(-field.Width * field.CellSize.x * field.Pivot.x, 0, -field.Height * field.CellSize.y * field.Pivot.y);
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float3 GetGridOffset(this FieldSettings field)
+        {
+            return new float3(-field.FieldSize.x * field.CellSize.x * field.Pivot.x, 0, -field.FieldSize.y * field.CellSize.y * field.Pivot.y);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int2 IndexToCell(this Field field, int index)
@@ -62,7 +71,7 @@ namespace Latios.FlowFieldNavigation
         public static float3 CellToWorld(this Field field, int2 cell)
         {
             var index = Grid.CellToIndex(field.Width, cell);
-            return field.CellColliders[index].transform.position;
+            return field.TransformsMap[index].position;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -70,6 +79,13 @@ namespace Latios.FlowFieldNavigation
         {
             var cell = Grid.IndexToCell(index, field.Width);
             return CellToWorld(cell, field.GetGridOffset(), field.CellSize, field.Transform.Value.position, field.Transform.Value.rotation);
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float3 IndexToWorld(this FieldSettings field, TransformQvvs fieldTransform, int index)
+        {
+            var cell = Grid.IndexToCell(index, field.FieldSize.x);
+            return CellToWorld(cell, field.GetGridOffset(), field.CellSize, fieldTransform.position, fieldTransform.rotation);
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -142,6 +158,18 @@ namespace Latios.FlowFieldNavigation
         {
             var cell = WorldToCell(worldPosition, gridOffset, cellSize, gridPosition, gridRotation);
             return Grid.CellToIndex(width, cell);
+        }
+
+        public static Aabb GetAabb(this Field field)
+        {
+            var tranform = field.Transform.Value;
+            var halfSize = new float2(field.Width, field.Height) * 0.5f;
+            var localAabb = new Aabb
+            {
+                min = new float3(-halfSize.x, 0f, -halfSize.y),
+                max = new float3(halfSize.x, 0f, halfSize.y)
+            };
+            return Physics.TransformAabb(tranform, localAabb);
         }
     }
 }

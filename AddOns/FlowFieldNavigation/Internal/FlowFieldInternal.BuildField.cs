@@ -1,4 +1,5 @@
-﻿using Latios.Psyshock;
+﻿using System.Runtime.CompilerServices;
+using Latios.Psyshock;
 using Latios.Transforms;
 using Latios.Unsafe;
 using Unity.Burst;
@@ -6,10 +7,9 @@ using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
-using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
-using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
+using Physics = Latios.Psyshock.Physics;
 
 namespace Latios.FlowFieldNavigation
 {
@@ -17,39 +17,112 @@ namespace Latios.FlowFieldNavigation
     internal static partial class FlowFieldInternal
     {
         [BurstCompile]
-        internal struct BuildCellsBodiesJob : IJobFor
+        internal struct BuildCellsJob : IJobFor
         {
+            internal TransformQvvs FieldTransform;
+            internal FieldSettings FieldSettings;
+            
             [NativeDisableParallelForRestriction]
-            internal Field Field;
+            internal NativeArray<TransformQvvs> Transforms;
+            
+            [NativeDisableParallelForRestriction]
+            internal NativeArray<Aabb> Aabbs;
 
             public void Execute(int index)
             {
-                var position = Field.IndexToWorld(index);
-                var rotation = Field.Transform.Value.rotation;
-                var halfSize = Field.CellSize.x0y() / 2f;
-                Field.CellColliders[index] = new ColliderBody
+                var position = FieldSettings.IndexToWorld(FieldTransform, index);
+                var rotation = FieldTransform.rotation;
+                var tranform = new TransformQvvs(position, rotation);
+                var halfSize = FieldSettings.CellSize * 0.5f;
+                var localAabb = new Aabb
                 {
-                    collider = new BoxCollider(float3.zero, halfSize),
-                    transform = new TransformQvvs(position, rotation),
-                    entity = new Entity { Index = index }
+                    min = new float3(-halfSize.x, 0f, -halfSize.y),
+                    max = new float3(halfSize.x, 0f, halfSize.y)
                 };
+
+                Transforms[index] = tranform;
+                Aabbs[index] = Physics.TransformAabb(tranform, localAabb);
             }
         }
 
-        [BurstCompile]
-        internal struct ObstaclesProcessor : IFindPairsProcessor
+        internal struct ObstaclesProcessor : IFindObjectsProcessor
         {
             [NativeDisableParallelForRestriction]
             internal Field Field;
 
-            [BurstCompile]
-            public void Execute(in FindPairsResult result)
+            public void Execute(in FindObjectsResult result)
             {
-                if (!Physics.DistanceBetween(result.colliderA, result.transformA, result.colliderB, result.transformB, 0.001f, out _))
-                    return;
+                var list = new NativeList<int>(allocator: Allocator.Temp);
+                
+                FilterCells(Field, result.aabb, ref list);
+                foreach (var i in list)
+                {
+                    var transform = Field.TransformsMap[i];
+                    var maxDistance = math.max(Field.CellSize.x, Field.CellSize.y) * 0.5f;
+                    if (!Physics.DistanceBetween(transform.position, result.collider, result.transform, maxDistance, out _))
+                        continue;
 
-                var index = result.entityB.entity.Index;
-                Field.PassabilityMap[index] = -1;
+                    Field.PassabilityMap[i] = -1;
+                }
+
+                list.Dispose();
+            }
+
+            static void FilterCells(Field field, Aabb aabb, ref NativeList<int> cells)
+            {
+                var fieldTransform = field.Transform.Value;
+                var cellSize = field.CellSize;
+                var gridOffset = field.GetGridOffset();
+                var invRotation = math.inverse(fieldTransform.rotation);
+
+                var worldCorners = new float3x4
+                {
+                    c0 = new float3(aabb.min.x, 0f, aabb.min.z),
+                    c1 = new float3(aabb.max.x, 0f, aabb.min.z),
+                    c2 = new float3(aabb.max.x, 0f, aabb.max.z),
+                    c3 = new float3(aabb.min.x, 0f, aabb.max.z)
+                };
+
+                float2 minLocal = float.MaxValue;
+                float2 maxLocal = float.MinValue;
+                for (var i = 0; i < 4; i++)
+                {
+                    var localPos = worldCorners[i] - fieldTransform.position;
+                    var unrotatedPos = math.rotate(invRotation, localPos);
+                    var adjustedPos = unrotatedPos - gridOffset;
+                    var localPoint = new float2(adjustedPos.x, adjustedPos.z);
+
+                    minLocal = math.min(minLocal, localPoint);
+                    maxLocal = math.max(maxLocal, localPoint);
+                }
+
+                var minCell = (int2)math.floor(minLocal / cellSize);
+                var maxCell = (int2)math.floor(maxLocal / cellSize);
+
+                minCell = math.clamp(minCell, 0, new int2(field.Width - 1, field.Height - 1));
+                maxCell = math.clamp(maxCell, 0, new int2(field.Width - 1, field.Height - 1));
+
+                for (var y = minCell.y; y <= maxCell.y; y++)
+                {
+                    for (var x = minCell.x; x <= maxCell.x; x++)
+                    {
+                        var cell = new int2(x, y);
+                        var index = field.CellToIndex(cell);
+                        var cellAabb = field.AabbMap[index];
+
+                        if (AabbOverlap(aabb, cellAabb))
+                        {
+                            cells.Add(index);
+                        }
+                    }
+                }
+
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                static bool AabbOverlap(Aabb a, Aabb b)
+                {
+                    return a.max.x >= b.min.x && a.min.x <= b.max.x &&
+                           a.max.z >= b.min.z && a.min.z <= b.max.z;
+                }
             }
         }
 
