@@ -231,7 +231,7 @@ namespace Latios.FlowFieldNavigation
                     var neighborIndex = Grid.CellToIndex(Width, neighbor);
                     var neighborCost = CostField[neighborIndex];
                     if (neighborCost > FlowSettings.PassabilityLimit) continue;
-                    var resultCost = neighborCost + DensityField[index] * Settings.DensityInfluence;
+                    var resultCost = neighborCost + DensityField[neighborIndex] * Settings.DensityInfluence;
 
                     var costDifference = resultCost - current;
                     var addGradient = costDifference * dir.ToVector();
