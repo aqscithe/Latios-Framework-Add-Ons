@@ -64,6 +64,7 @@ namespace Latios.Anna.Systems
                 physicsSettings       = physicsSettings,
                 rigidBodyHandle       = GetComponentTypeHandle<RigidBody>(false),
                 gravityOverrideHandle = GetComponentTypeHandle<GravityOverride>(true),
+                timeScaleHandle       = GetComponentTypeHandle<TimeScale>(true),
                 startIndices          = startIndices,
                 states                = states,
                 transformHandle       = GetComponentTypeHandle<WorldTransform>(true)
@@ -86,6 +87,7 @@ namespace Latios.Anna.Systems
             [ReadOnly] public ComponentTypeHandle<LocalCenterOfMassOverride> centerOverrideHandle;
             [ReadOnly] public ComponentTypeHandle<LocalInertiaOverride>      inertiaOverrideHandle;
             [ReadOnly] public ComponentTypeHandle<GravityOverride>           gravityOverrideHandle;
+            [ReadOnly] public ComponentTypeHandle<TimeScale>                 timeScaleHandle;
             [ReadOnly] public NativeArray<int>                               startIndices;
 
             public ComponentTypeHandle<RigidBody>          rigidBodyHandle;
@@ -107,6 +109,7 @@ namespace Latios.Anna.Systems
                 var centerOverrides  = chunk.GetComponentDataPtrRO(ref centerOverrideHandle);
                 var inertiaOverrides = chunk.GetComponentDataPtrRO(ref inertiaOverrideHandle);
                 var gravityOverrides = chunk.GetComponentDataPtrRO(ref gravityOverrideHandle);
+                var timeScales       = chunk.GetComponentDataPtrRO(ref timeScaleHandle);
                 var rigidBodies      = (RigidBody*)chunk.GetRequiredComponentDataPtrRW(ref rigidBodyHandle);
                 var impulses         = chunk.GetBufferAccessor(ref addImpulseHandle);
                 var aabbs            = (Aabb*)chunk.GetComponentDataPtrRW(ref aabbHandle);
@@ -131,15 +134,22 @@ namespace Latios.Anna.Systems
                                                        out var mass,
                                                        out var inertialPoseWorldTransform);
 
+                    
+                    float timeScale = timeScales == null ? 1.0f : math.max(timeScales[i].timescale, 1e-6f);
+                    float deltaTime = timeScale * dt;
 
                     float3 gravity = gravityOverrides == null ? physicsSettings.gravity : gravityOverrides[i].gravity;
                     
-                    rigidBody.velocity.linear += gravity * dt;
+                    rigidBody.velocity.linear += gravity * deltaTime;
 
                     if (impulses.Length > 0)
                     {
+                        
+
                         foreach (var impulse in impulses[i])
                         {
+                            //var scaledImpulse = impulse.impulse * timeScale;
+
                             if (math.all(math.isnan(impulse.pointOrAxis)))
                                 UnitySim.ApplyFieldImpulse(ref rigidBody.velocity, in mass, impulse.impulse);
                             else if (math.all(math.isnan(impulse.impulse.yz)))
@@ -150,7 +160,7 @@ namespace Latios.Anna.Systems
                         impulses[i].Clear();
                     }
 
-                    var motionExpansion = new UnitySim.MotionExpansion(in rigidBody.velocity, dt, angularExpansion);
+                    var motionExpansion = new UnitySim.MotionExpansion(in rigidBody.velocity, deltaTime, angularExpansion);
                     aabb                = motionExpansion.ExpandAabb(aabb);
                     var bucketIndex     = bucketCalculator.BucketIndexFrom(in aabb);
 
@@ -171,7 +181,8 @@ namespace Latios.Anna.Systems
                         motionExpansion                    = motionExpansion,
                         motionStabilizer                   = new UnitySim.MotionStabilizer(in rigidBody.velocity),
                         numOtherSignificantBodiesInContact = 0,
-                        velocity                           = rigidBody.velocity
+                        velocity                           = rigidBody.velocity,
+                        timeScale                          = timeScale,
                     };
                 }
             }

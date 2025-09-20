@@ -29,6 +29,11 @@ namespace Latios.Anna.Authoring
 
         [Header("Custom Gravity Properties")]
         public float3 gravityOverride    = new float3(0f, -9.81f, 0f);
+
+        [Header("Experimental")]
+        [Header("Time Scale")]
+        public bool useTimeScale = false;
+        public float timeScale = 1f;
     }
 
     public class AnnaRigidBodyAuthoringBaker : Baker<AnnaRigidBodyAuthoring>
@@ -64,6 +69,13 @@ namespace Latios.Anna.Authoring
             {
                 AddComponent(entity, new GravityOverride {
                     gravity = authoring.gravityOverride
+                });
+            }
+            if(authoring.useTimeScale)
+            {
+                AddComponent(entity, new TimeScale
+                {
+                    timescale = authoring.timeScale,
                 });
             }
         }

@@ -20,7 +20,7 @@ namespace Latios.Shockwave
 
     public partial struct WorldCollisionAspect
     {
-        private CollisionWorld collisionWorld;
+        public CollisionWorld collisionWorld;
 
         public partial struct Mask
         {
