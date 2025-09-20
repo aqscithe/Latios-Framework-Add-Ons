@@ -1,4 +1,4 @@
-# Latios Framework Add-Ons [0.5.2]
+# Latios Framework Add-Ons [0.6.0]
 
 This is an extra Unity package for the Latios Framework containing various
 add-on modules and functionality.
