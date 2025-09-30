@@ -26,6 +26,7 @@ namespace Latios.Anna.Authoring
 
         [Tooltip("Enables the custom gravity properties below")]
         public bool supportCustomGravity  = false;
+        public bool supportAdditionalGravitySources = false;
 
         [Header("Custom Gravity Properties")]
         public float3 gravityOverride    = new float3(0f, -9.81f, 0f);
@@ -70,6 +71,10 @@ namespace Latios.Anna.Authoring
                 AddComponent(entity, new GravityOverride {
                     gravity = authoring.gravityOverride
                 });
+            }
+            if (authoring.supportAdditionalGravitySources)
+            {
+                AddBuffer<AdditionalGravitySources>(entity);
             }
             if(authoring.useTimeScale)
             {

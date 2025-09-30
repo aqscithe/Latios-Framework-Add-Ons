@@ -55,6 +55,11 @@ namespace Latios.Anna
         public float3 gravity;
     }
 
+    public struct AdditionalGravitySources : IBufferElementData
+    {
+        public float3 gravity;
+    }
+
     public struct  TimeScale : IComponentData
     {
         public float timescale;

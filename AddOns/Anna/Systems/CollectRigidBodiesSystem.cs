@@ -64,6 +64,7 @@ namespace Latios.Anna.Systems
                 physicsSettings       = physicsSettings,
                 rigidBodyHandle       = GetComponentTypeHandle<RigidBody>(false),
                 gravityOverrideHandle = GetComponentTypeHandle<GravityOverride>(true),
+                gravitySourcesHandle  = GetBufferTypeHandle<AdditionalGravitySources>(true),
                 timeScaleHandle       = GetComponentTypeHandle<TimeScale>(true),
                 startIndices          = startIndices,
                 states                = states,
@@ -86,8 +87,9 @@ namespace Latios.Anna.Systems
             [ReadOnly] public ComponentTypeHandle<Collider>                  colliderHandle;
             [ReadOnly] public ComponentTypeHandle<LocalCenterOfMassOverride> centerOverrideHandle;
             [ReadOnly] public ComponentTypeHandle<LocalInertiaOverride>      inertiaOverrideHandle;
-            [ReadOnly] public ComponentTypeHandle<GravityOverride>           gravityOverrideHandle;
             [ReadOnly] public ComponentTypeHandle<TimeScale>                 timeScaleHandle;
+            [ReadOnly] public ComponentTypeHandle<GravityOverride>           gravityOverrideHandle;
+            [ReadOnly] public BufferTypeHandle<AdditionalGravitySources>     gravitySourcesHandle;
             [ReadOnly] public NativeArray<int>                               startIndices;
 
             public ComponentTypeHandle<RigidBody>          rigidBodyHandle;
@@ -109,6 +111,7 @@ namespace Latios.Anna.Systems
                 var centerOverrides  = chunk.GetComponentDataPtrRO(ref centerOverrideHandle);
                 var inertiaOverrides = chunk.GetComponentDataPtrRO(ref inertiaOverrideHandle);
                 var gravityOverrides = chunk.GetComponentDataPtrRO(ref gravityOverrideHandle);
+                var gravitySources   = chunk.GetBufferAccessor(ref gravitySourcesHandle);
                 var timeScales       = chunk.GetComponentDataPtrRO(ref timeScaleHandle);
                 var rigidBodies      = (RigidBody*)chunk.GetRequiredComponentDataPtrRW(ref rigidBodyHandle);
                 var impulses         = chunk.GetBufferAccessor(ref addImpulseHandle);
@@ -135,10 +138,20 @@ namespace Latios.Anna.Systems
                                                        out var inertialPoseWorldTransform);
 
                     
-                    float timeScale = timeScales == null ? 1.0f : math.max(timeScales[i].timescale, 1e-6f);
+                    
+                    float timeScale = timeScales == null ? 1.0f : timeScales[i].timescale;
                     float deltaTime = timeScale * dt;
 
                     float3 gravity = gravityOverrides == null ? physicsSettings.gravity : gravityOverrides[i].gravity;
+
+                    if (gravitySources.Length > 0)
+                    {
+                        foreach (var gravitySource in gravitySources[i])
+                        {
+                            gravity += gravitySource.gravity;
+                        }
+                        gravitySources[i].Clear();
+                    }
                     
                     rigidBody.velocity.linear += gravity * deltaTime;
 
