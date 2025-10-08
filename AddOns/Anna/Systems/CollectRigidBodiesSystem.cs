@@ -64,7 +64,7 @@ namespace Latios.Anna.Systems
                 physicsSettings       = physicsSettings,
                 rigidBodyHandle       = GetComponentTypeHandle<RigidBody>(false),
                 gravityOverrideHandle = GetComponentTypeHandle<GravityOverride>(true),
-                gravitySourcesHandle  = GetBufferTypeHandle<AdditionalGravitySources>(true),
+                gravitySourcesHandle  = GetBufferTypeHandle<AdditionalGravitySources>(false),
                 timeScaleHandle       = GetComponentTypeHandle<TimeScale>(true),
                 startIndices          = startIndices,
                 states                = states,
@@ -89,9 +89,9 @@ namespace Latios.Anna.Systems
             [ReadOnly] public ComponentTypeHandle<LocalInertiaOverride>      inertiaOverrideHandle;
             [ReadOnly] public ComponentTypeHandle<TimeScale>                 timeScaleHandle;
             [ReadOnly] public ComponentTypeHandle<GravityOverride>           gravityOverrideHandle;
-            [ReadOnly] public BufferTypeHandle<AdditionalGravitySources>     gravitySourcesHandle;
             [ReadOnly] public NativeArray<int>                               startIndices;
 
+            public BufferTypeHandle<AdditionalGravitySources> gravitySourcesHandle;
             public ComponentTypeHandle<RigidBody>          rigidBodyHandle;
             public BufferTypeHandle<AddImpulse>            addImpulseHandle;
             public ComponentTypeHandle<CollisionWorldAabb> aabbHandle;
