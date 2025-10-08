@@ -14,7 +14,6 @@ namespace Latios.Anna
         public UnitySim.MotionStabilizer motionStabilizer;
         public float3                    gravity;
         public float                     angularExpansion;
-        public float                     timeScale;       
         public int                       bucketIndex;
         public int                       numOtherSignificantBodiesInContact;
         public half                      coefficientOfFriction;
