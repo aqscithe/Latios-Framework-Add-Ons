@@ -64,7 +64,6 @@ namespace Latios.Anna.Systems
                 physicsSettings       = physicsSettings,
                 rigidBodyHandle       = GetComponentTypeHandle<RigidBody>(false),
                 gravityOverrideHandle = GetComponentTypeHandle<GravityOverride>(true),
-                gravitySourcesHandle  = GetBufferTypeHandle<AdditionalGravitySources>(false),
                 timeScaleHandle       = GetComponentTypeHandle<TimeScale>(true),
                 startIndices          = startIndices,
                 states                = states,
@@ -91,7 +90,6 @@ namespace Latios.Anna.Systems
             [ReadOnly] public ComponentTypeHandle<GravityOverride>           gravityOverrideHandle;
             [ReadOnly] public NativeArray<int>                               startIndices;
 
-            public BufferTypeHandle<AdditionalGravitySources> gravitySourcesHandle;
             public ComponentTypeHandle<RigidBody>          rigidBodyHandle;
             public BufferTypeHandle<AddImpulse>            addImpulseHandle;
             public ComponentTypeHandle<CollisionWorldAabb> aabbHandle;
@@ -111,7 +109,6 @@ namespace Latios.Anna.Systems
                 var centerOverrides  = chunk.GetComponentDataPtrRO(ref centerOverrideHandle);
                 var inertiaOverrides = chunk.GetComponentDataPtrRO(ref inertiaOverrideHandle);
                 var gravityOverrides = chunk.GetComponentDataPtrRO(ref gravityOverrideHandle);
-                var gravitySources   = chunk.GetBufferAccessor(ref gravitySourcesHandle);
                 var timeScales       = chunk.GetComponentDataPtrRO(ref timeScaleHandle);
                 var rigidBodies      = (RigidBody*)chunk.GetRequiredComponentDataPtrRW(ref rigidBodyHandle);
                 var impulses         = chunk.GetBufferAccessor(ref addImpulseHandle);
@@ -136,29 +133,16 @@ namespace Latios.Anna.Systems
                                                        rigidBody.inverseMass,
                                                        out var mass,
                                                        out var inertialPoseWorldTransform);
-
-                    
                     
                     float timeScale = timeScales == null ? 1.0f : timeScales[i].timescale;
                     float deltaTime = timeScale * dt;
 
                     float3 gravity = gravityOverrides == null ? physicsSettings.gravity : gravityOverrides[i].gravity;
-
-                    if (gravitySources.Length > 0)
-                    {
-                        foreach (var gravitySource in gravitySources[i])
-                        {
-                            gravity += gravitySource.gravity;
-                        }
-                        gravitySources[i].Clear();
-                    }
                     
                     rigidBody.velocity.linear += gravity * deltaTime;
 
                     if (impulses.Length > 0)
                     {
-                        
-
                         foreach (var impulse in impulses[i])
                         {
                             //var scaledImpulse = impulse.impulse * timeScale;
