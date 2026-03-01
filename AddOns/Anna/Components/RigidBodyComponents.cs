@@ -50,6 +50,10 @@ namespace Latios.Anna
         public UnitySim.LocalInertiaTensorDiagonal inertiaDiagonal;
     }
 
+    // For rigid bodies that need a custom gravity value outside of the global
+    // gravity either permanently or for an extended period of time. Such rigidbodies
+    // are still subject to environmental gravity effects and hazards. 
+    // See GravityEffectImmuneTag if seeking immunity from those effects.
     public struct GravityOverride : IComponentData
     {
         public float3 gravity;
