@@ -1,7 +1,9 @@
 ﻿using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -16,146 +18,209 @@ namespace Latios.FlowFieldNavigation
             [ReadOnly] internal Field Field;
             [ReadOnly] internal FlowGoalTypeHandles TypeHandles;
 
-            internal NativeList<int2>.ParallelWriter GoalCells;
+            internal NativeHashSet<int2> GoalCells;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var chunkTransforms = TypeHandles.WorldTransform.Resolve(chunk);
+                var chunkGoals = chunk.GetNativeArray(ref TypeHandles.GoalTypeHandle);
 
                 var enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
 
                 while (enumerator.NextEntityIndex(out var i))
                 {
                     var position = chunkTransforms[i].position;
+                    var footprintSize = chunkGoals[i].Size;
 
-                    if (!Field.TryWorldToFootprint(position, out var footprint, out _)) continue;
-                    GoalCells.AddNoResize(footprint.xy);
-                    if (footprint.x != footprint.z && footprint.y != footprint.w)
+                    if (!Field.TryWorldToFootprint(position, footprintSize, out var footprint)) continue;
+
+                    var minCell = footprint.xy;
+                    var maxCell = footprint.zw;
+
+                    for (var x = minCell.x; x <= maxCell.x; x++)
+                    for (var y = minCell.y; y <= maxCell.y; y++)
                     {
-                        GoalCells.AddNoResize(footprint.zy);
-                        GoalCells.AddNoResize(footprint.xw);
-                        GoalCells.AddNoResize(footprint.zw);
+                        var cell = new int2(x, y);
+                        if (!Field.IsValidCell(cell)) continue;
+                        GoalCells.Add(cell);
                     }
                 }
             }
         }
-        
+
         [BurstCompile]
-        internal struct CalculateCostsWithPriorityQueueJob : IJob
+        internal struct CalculateCostsWavefrontJob : IJob
         {
-            internal const float HeapCapacityFactor = 0.35f;
-            
-            [ReadOnly] internal Field Field;
-            [ReadOnly] internal NativeList<int2> GoalCells;
-            
+            [ReadOnly] internal NativeArray<int> PassabilityMap;
+            [ReadOnly] internal NativeHashSet<int2> GoalCells;
+            internal int Width, Height;
+
+            [NativeDisableContainerSafetyRestriction]
             internal NativeArray<float> Costs;
 
             public void Execute()
             {
-                int width = Field.Width;
-                int height = Field.Height;
+                var totalCells = Width * Height;
+                var wave = new NativeList<int>(GoalCells.Count * 4, Allocator.Temp);
+                var nextWave = new NativeList<int>(GoalCells.Count * 4, Allocator.Temp);
+                var inQueue = new NativeBitArray(totalCells, Allocator.Temp);
 
-                for (var i = 0; i < Costs.Length; i++) Costs[i] = FlowSettings.PassabilityLimit + 1;
-                int initialHeapCapacity = math.max(64, (int)(width * height * HeapCapacityFactor));
-                var queue = new NativePriorityQueue<CostEntry, CostComparer>(initialHeapCapacity, Allocator.Temp);
-                var visited = new NativeBitArray(width * height, Allocator.Temp);
-                
                 foreach (var goal in GoalCells)
                 {
-                    queue.Enqueue(new(goal, 0));
-                    Costs[Grid.CellToIndex(width, goal)] = 0;
+                    var idx = goal.y * Width + goal.x;
+                    wave.Add(idx);
+                    inQueue.Set(idx, true);
                 }
-                
-                while (queue.TryDequeue(out var current))
+
+                while (wave.Length > 0)
                 {
-                    var currentCost = Costs[Grid.CellToIndex(width, current.Pos)];
-
-                    for (var dir = Grid.Direction.Up; dir <= Grid.Direction.DownRight; dir++)
+                    for (var i = 0; i < wave.Length; i++)
                     {
-                        if (!Grid.TryGetNeighborCell(width, height, current.Pos, dir, out var neighbor)) continue;
+                        var cellIndex = wave[i];
+                        var currentCost = Costs[cellIndex];
+                        var cellX = cellIndex % Width;
+                        var cellY = cellIndex / Width;
 
-                        var neighborIndex = Grid.CellToIndex(width, neighbor);
-                        if (visited.IsSet(neighborIndex)) continue;
+                        ProcessNeighbor(cellIndex, cellX, cellY, 0, Width, currentCost, 1f, ref nextWave, ref inQueue);
+                        ProcessNeighbor(cellIndex, cellX, cellY, 1, -Width, currentCost, 1f, ref nextWave, ref inQueue);
+                        ProcessNeighbor(cellIndex, cellX, cellY, 2, -1, currentCost, 1f, ref nextWave, ref inQueue);
+                        ProcessNeighbor(cellIndex, cellX, cellY, 3, 1, currentCost, 1f, ref nextWave, ref inQueue);
+                        ProcessNeighbor(cellIndex, cellX, cellY, 4, Width - 1, currentCost, math.SQRT2, ref nextWave, ref inQueue);
+                        ProcessNeighbor(cellIndex, cellX, cellY, 5, Width + 1, currentCost, math.SQRT2, ref nextWave, ref inQueue);
+                        ProcessNeighbor(cellIndex, cellX, cellY, 6, -Width - 1, currentCost, math.SQRT2, ref nextWave, ref inQueue);
+                        ProcessNeighbor(cellIndex, cellX, cellY, 7, -Width + 1, currentCost, math.SQRT2, ref nextWave, ref inQueue);
+                    }
 
-                        if (Field.PassabilityMap[neighborIndex] < 0) continue;
+                    (wave, nextWave) = (nextWave, wave);
+                    nextWave.Clear();
+                    inQueue.Clear();
+                }
 
-                        var moveCost = Field.PassabilityMap[neighborIndex] + (dir > Grid.Direction.Right ? math.SQRT2 : 1);
+                wave.Dispose();
+                nextWave.Dispose();
+                inQueue.Dispose();
+            }
 
-                        var newCost = currentCost + moveCost;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            void ProcessNeighbor(int cellIndex, int cellX, int cellY, int dir, int offset, float currentCost, float baseCost, ref NativeList<int> nextWave, ref NativeBitArray inQueue)
+            {
+                if (!IsNeighborValid(cellX, cellY, dir)) return;
 
-                        if (newCost < Costs[neighborIndex])
-                        {
-                            Costs[neighborIndex] = newCost;
-                            queue.Enqueue(new(neighbor, newCost));
-                            visited.Set(neighborIndex, true);
-                        }
+                var neighborIndex = cellIndex + offset;
+                var passability = PassabilityMap[neighborIndex];
+
+                if ((uint)passability >= FlowSettings.PassabilityLimit) return;
+
+                var newCost = currentCost + passability + baseCost;
+
+                if (newCost < Costs[neighborIndex])
+                {
+                    Costs[neighborIndex] = newCost;
+
+                    if (!inQueue.IsSet(neighborIndex))
+                    {
+                        nextWave.Add(neighborIndex);
+                        inQueue.Set(neighborIndex, true);
                     }
                 }
-
-                queue.Dispose();
-                visited.Dispose();
             }
 
-            struct CostComparer : IComparer<CostEntry>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            bool IsNeighborValid(int x, int y, int dir) => dir switch
             {
-                public int Compare(CostEntry x,
-                    CostEntry y) => x.Cost.CompareTo(y.Cost);
-            }
+                0 => y < Height - 1,
+                1 => y > 0,
+                2 => x > 0,
+                3 => x < Width - 1,
+                4 => x > 0 && y < Height - 1,
+                5 => x < Width - 1 && y < Height - 1,
+                6 => x > 0 && y > 0,
+                7 => x < Width - 1 && y > 0,
+                _ => false
+            };
+        }
+        
+        [BurstCompile]
+        internal struct ResetJob : IJob
+        {
+            internal NativeArray<float> Costs;
+            internal NativeHashSet<int2> GoalCells;
+            internal int Width, Height;
 
-            readonly struct CostEntry
+            public void Execute()
             {
-                public readonly float Cost;
-                public readonly int2 Pos;
-
-                public CostEntry(int2 pos, float cost)
+                for (var index = 0; index < Costs.Length; index++)
                 {
-                    Pos = pos;
-                    Cost = cost;
+                    Costs[index] = FlowSettings.PassabilityLimit + 1;
+                }
+
+                foreach (var goal in GoalCells)
+                {
+                    Costs[Grid.CellToIndex(Width, goal)] = 0;
                 }
             }
         }
-
+        
         [BurstCompile]
         internal struct CalculateDirectionJob : IJobFor
         {
             [ReadOnly] internal NativeArray<float> CostField;
             [ReadOnly] internal NativeArray<float> DensityField;
-            
+
             internal FlowSettings Settings;
             internal NativeArray<float2> DirectionMap;
             internal int Width;
             internal int Height;
-        
+
             public void Execute(int index)
             {
-                var cell = Grid.IndexToCell(index, Width);
-                var gradient = float2.zero;
                 var currentCost = CostField[index];
-        
+
                 if (currentCost <= 0)
                 {
                     DirectionMap[index] = float2.zero;
                     return;
                 }
-        
-                var current = currentCost + DensityField[index] * Settings.DensityInfluence;
-        
-                for (var dir = Grid.Direction.Up; dir <= Grid.Direction.Right; dir++)
-                {
-                    if (!Grid.TryGetNeighborCell(Width, Height, cell, dir, out var neighbor)) continue;
-        
-                    var neighborIndex = Grid.CellToIndex(Width, neighbor);
-                    var neighborCost = CostField[neighborIndex];
-                    if (neighborCost > FlowSettings.PassabilityLimit) continue;
-                    var resultCost = neighborCost + DensityField[neighborIndex] * Settings.DensityInfluence;
-        
-                    var costDifference = resultCost - current;
-                    var addGradient = costDifference * dir.ToVector();
-                    gradient += addGradient;
-                }
-        
+
+                var cellX = index % Width;
+                var cellY = index / Width;
+                var densityInfluence = Settings.DensityInfluence;
+                var current = currentCost + DensityField[index] * densityInfluence;
+
+                var gradient = float2.zero;
+
+                AccumulateGradient(index, cellX, cellY, 0, Width, new float2(0, 1), current, densityInfluence, ref gradient);
+                AccumulateGradient(index, cellX, cellY, 1, -Width, new float2(0, -1), current, densityInfluence, ref gradient);
+                AccumulateGradient(index, cellX, cellY, 2, -1, new float2(-1, 0), current, densityInfluence, ref gradient);
+                AccumulateGradient(index, cellX, cellY, 3, 1, new float2(1, 0), current, densityInfluence, ref gradient);
+
                 DirectionMap[index] = math.normalizesafe(-gradient);
             }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            void AccumulateGradient(int cellIndex, int cellX, int cellY, int dir, int offset, float2 dirVector, float current, float densityInfluence, ref float2 gradient)
+            {
+                if (!IsNeighborValid(cellX, cellY, dir)) return;
+
+                var neighborIndex = cellIndex + offset;
+                var neighborCost = CostField[neighborIndex];
+
+                if (neighborCost > FlowSettings.PassabilityLimit) return;
+
+                var resultCost = neighborCost + DensityField[neighborIndex] * densityInfluence;
+                var costDifference = resultCost - current;
+                gradient += costDifference * dirVector;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            bool IsNeighborValid(int x, int y, int dir) => dir switch
+            {
+                0 => y < Height - 1,  // Up
+                1 => y > 0,           // Down
+                2 => x > 0,           // Left
+                3 => x < Width - 1,   // Right
+                _ => false
+            };
         }
     }
 }
