@@ -17,11 +17,14 @@ namespace Latios.Anna.Electromagnetism.Systems
     /// Two receiver categories handled in separate parallel jobs:
     ///
     /// <list type="number">
-    /// <item><b>Permanent / pre-stamped m.</b> Any entity carrying both
-    /// <see cref="MagneticDipoleMoment"/> (with non-zero <c>worldMoment</c>)
-    /// and Anna's <see cref="AddImpulse"/> buffer. The moment was set by
+    /// <item><b>Permanent magnet.</b> Any entity carrying
+    /// <see cref="PermanentMagnet"/> + <see cref="MagneticDipoleMoment"/> and
+    /// Anna's <see cref="AddImpulse"/> buffer. The world moment was set by
     /// <see cref="WriteSourceContributionsSystem"/> earlier in the substep
-    /// (Phase B).</item>
+    /// (Phase B). The job subtracts the magnet's own deposited contribution
+    /// from B and ∇B before computing F/τ so the source-also-receiver doesn't
+    /// feel its own field. <see cref="PermanentMagnet.influenceRadius"/> is
+    /// read to mirror the source-write cutoff exactly.</item>
     ///
     /// <item><b>Ferromagnetic / induced m.</b> Entities carrying
     /// <see cref="Ferromagnet"/>. The induced moment is computed from the
@@ -44,6 +47,7 @@ namespace Latios.Anna.Electromagnetism.Systems
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
             _permanentReceiverQuery = state.Fluent()
+                .With<PermanentMagnet>(true)
                 .With<MagneticDipoleMoment>(true)
                 .With<WorldTransform>(true)
                 .With<RigidBody>(true)
@@ -75,10 +79,15 @@ namespace Latios.Anna.Electromagnetism.Systems
             float dt          = state.WorldUnmanaged.Time.DeltaTime;
             float forceScale  = settings.globalForceScale;
 
-            var permanentJh = state.Dependency;
+            // Chain order matters: the ferromagnet job writes MagneticDipoleMoment
+            // (the induced moment for each ferro receiver), and the permanent
+            // job reads MagneticDipoleMoment. Safety system tracks this by
+            // ComponentTypeHandle regardless of chunk partitioning, so the two
+            // can't run in parallel — schedule permanent first, ferro after.
+            var jh = state.Dependency;
             if (!_permanentReceiverQuery.IsEmpty)
             {
-                permanentJh = new PermanentReceiverJob
+                jh = new PermanentReceiverJob
                 {
                     B          = field.B,
                     resolution = field.resolution,
@@ -86,13 +95,12 @@ namespace Latios.Anna.Electromagnetism.Systems
                     cellSize   = field.cellSize,
                     dt         = dt,
                     forceScale = forceScale,
-                }.ScheduleParallel(_permanentReceiverQuery, state.Dependency);
+                }.ScheduleParallel(_permanentReceiverQuery, jh);
             }
 
-            var ferroJh = state.Dependency;
             if (!_ferromagnetReceiverQuery.IsEmpty)
             {
-                ferroJh = new FerromagnetReceiverJob
+                jh = new FerromagnetReceiverJob
                 {
                     B          = field.B,
                     resolution = field.resolution,
@@ -100,10 +108,10 @@ namespace Latios.Anna.Electromagnetism.Systems
                     cellSize   = field.cellSize,
                     dt         = dt,
                     forceScale = forceScale,
-                }.ScheduleParallel(_ferromagnetReceiverQuery, state.Dependency);
+                }.ScheduleParallel(_ferromagnetReceiverQuery, jh);
             }
 
-            state.Dependency = JobHandle.CombineDependencies(permanentJh, ferroJh);
+            state.Dependency = jh;
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -154,7 +162,8 @@ namespace Latios.Anna.Electromagnetism.Systems
             public float  dt;
             public float  forceScale;
 
-            void Execute(in WorldTransform        transform,
+            void Execute(in PermanentMagnet       permanent,
+                         in WorldTransform        transform,
                          in MagneticDipoleMoment  moment,
                          ref DynamicBuffer<AddImpulse> impulses)
             {
@@ -164,6 +173,19 @@ namespace Latios.Anna.Electromagnetism.Systems
                 float3   pos    = transform.worldTransform.position;
                 float3   Bhere  = EMMath.SampleB(in B, resolution, origin, cellSize, pos);
                 float3x3 gradB  = EMMath.GradientB(in B, resolution, origin, cellSize, pos);
+
+                // Subtract this magnet's own contribution to the grid before
+                // computing F/τ. Without this, trilinear-sampling asymmetry
+                // near the source produces a spurious self-force in isolation.
+                // WriteSourceContributionsSystem deposits the same analytical
+                // dipole field these helpers reconstruct, so the cancellation
+                // is exact for any cell the source actually touched.
+                Bhere -= EMMath.SampleSelfDipoleContribution(
+                    moment.worldMoment, pos, permanent.influenceRadius,
+                    resolution, origin, cellSize, pos);
+                gradB -= EMMath.GradientSelfDipoleContribution(
+                    moment.worldMoment, pos, permanent.influenceRadius,
+                    resolution, origin, cellSize, pos);
 
                 AppendForceAndTorque(moment.worldMoment, Bhere, gradB, dt, forceScale, ref impulses);
             }

@@ -25,11 +25,11 @@ namespace Latios.Anna.Electromagnetism.Systems
     ///
     /// Self-contribution note: a source writes its own field to nearby cells,
     /// which means a permanent magnet sampling the grid at its own position
-    /// will see its own contribution. That produces a small fake self-force
-    /// when the gradient is asymmetric due to trilinear sampling. Tier 1 ships
-    /// with this artifact — it's noticeable on a magnet alone in the field but
-    /// invisible in the canonical "magnet pulls donut" test. Tier 1.5 will
-    /// subtract analytical self-contribution at receiver-sample time.
+    /// will see its own contribution. The matching subtraction lives in
+    /// <c>ComputeReceiverForcesSystem.PermanentReceiverJob</c>, which uses
+    /// <see cref="EMMath.SampleSelfDipoleContribution"/> /
+    /// <see cref="EMMath.GradientSelfDipoleContribution"/> to remove exactly
+    /// what was deposited here before computing F/τ.
     /// </summary>
     [DisableAutoCreation]
     [BurstCompile]

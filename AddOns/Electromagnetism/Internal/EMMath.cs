@@ -198,6 +198,101 @@ namespace Latios.Anna.Electromagnetism.Internal
         }
 
         // ────────────────────────────────────────────────────────────────────
+        // Self-contribution subtraction (for sources that also act as receivers)
+        // ────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Trilinear-interpolated B contribution from a single dipole source,
+        /// computed analytically at the same 8 cell centers <see cref="SampleB"/>
+        /// would touch at <paramref name="samplePos"/>. Subtracting this from
+        /// the grid sample removes the source's own contribution — necessary
+        /// when a magnet samples a grid that it itself wrote into, since
+        /// trilinear-sampling asymmetry near the source produces a small fake
+        /// self-force. Honors the same influence-radius cutoff and the same
+        /// near-source singularity guard as the source-write pass, so the
+        /// subtraction is exactly the contribution that was deposited.
+        /// </summary>
+        public static float3 SampleSelfDipoleContribution(float3 sourceMoment,
+                                                          float3 sourcePos,
+                                                          float  sourceRadius,
+                                                          int3   resolution,
+                                                          float3 origin,
+                                                          float  cellSize,
+                                                          float3 samplePos)
+        {
+            float3 c   = (samplePos - origin) / cellSize - 0.5f;
+            int3   c0  = (int3)math.floor(c);
+            float3 t   = c - (float3)c0;
+
+            if (math.any(c0 < -1) || math.any(c0 + 1 > resolution))
+                return float3.zero;
+
+            float radiusSq = sourceRadius * sourceRadius;
+
+            float3 b000 = SelfAt(c0 + new int3(0,0,0), resolution, origin, cellSize, sourceMoment, sourcePos, radiusSq);
+            float3 b100 = SelfAt(c0 + new int3(1,0,0), resolution, origin, cellSize, sourceMoment, sourcePos, radiusSq);
+            float3 b010 = SelfAt(c0 + new int3(0,1,0), resolution, origin, cellSize, sourceMoment, sourcePos, radiusSq);
+            float3 b110 = SelfAt(c0 + new int3(1,1,0), resolution, origin, cellSize, sourceMoment, sourcePos, radiusSq);
+            float3 b001 = SelfAt(c0 + new int3(0,0,1), resolution, origin, cellSize, sourceMoment, sourcePos, radiusSq);
+            float3 b101 = SelfAt(c0 + new int3(1,0,1), resolution, origin, cellSize, sourceMoment, sourcePos, radiusSq);
+            float3 b011 = SelfAt(c0 + new int3(0,1,1), resolution, origin, cellSize, sourceMoment, sourcePos, radiusSq);
+            float3 b111 = SelfAt(c0 + new int3(1,1,1), resolution, origin, cellSize, sourceMoment, sourcePos, radiusSq);
+
+            float3 b00 = math.lerp(b000, b100, t.x);
+            float3 b01 = math.lerp(b001, b101, t.x);
+            float3 b10 = math.lerp(b010, b110, t.x);
+            float3 b11 = math.lerp(b011, b111, t.x);
+            float3 b0  = math.lerp(b00,  b10,  t.y);
+            float3 b1  = math.lerp(b01,  b11,  t.y);
+            return math.lerp(b0, b1, t.z);
+        }
+
+        static float3 SelfAt(int3   cell,
+                             int3   resolution,
+                             float3 origin,
+                             float  cellSize,
+                             float3 sourceMoment,
+                             float3 sourcePos,
+                             float  radiusSq)
+        {
+            int3   clamped    = math.clamp(cell, 0, resolution - 1);
+            float3 cellCenter = CellCenter(clamped, origin, cellSize);
+            if (math.lengthsq(cellCenter - sourcePos) > radiusSq)
+                return float3.zero;
+            return DipoleField(sourceMoment, sourcePos, cellCenter);
+        }
+
+        /// <summary>
+        /// Central-difference gradient of a single dipole source's own grid
+        /// contribution, mirroring <see cref="GradientB"/>'s stencil. Subtract
+        /// from <see cref="GradientB"/> to recover the external-field gradient
+        /// at the source's position.
+        /// </summary>
+        public static float3x3 GradientSelfDipoleContribution(float3 sourceMoment,
+                                                              float3 sourcePos,
+                                                              float  sourceRadius,
+                                                              int3   resolution,
+                                                              float3 origin,
+                                                              float  cellSize,
+                                                              float3 samplePos)
+        {
+            float h = cellSize * 0.5f;
+            float invDenominator = 1f / (2f * h);
+
+            float3 bxp = SampleSelfDipoleContribution(sourceMoment, sourcePos, sourceRadius, resolution, origin, cellSize, samplePos + new float3(h, 0, 0));
+            float3 bxm = SampleSelfDipoleContribution(sourceMoment, sourcePos, sourceRadius, resolution, origin, cellSize, samplePos - new float3(h, 0, 0));
+            float3 byp = SampleSelfDipoleContribution(sourceMoment, sourcePos, sourceRadius, resolution, origin, cellSize, samplePos + new float3(0, h, 0));
+            float3 bym = SampleSelfDipoleContribution(sourceMoment, sourcePos, sourceRadius, resolution, origin, cellSize, samplePos - new float3(0, h, 0));
+            float3 bzp = SampleSelfDipoleContribution(sourceMoment, sourcePos, sourceRadius, resolution, origin, cellSize, samplePos + new float3(0, 0, h));
+            float3 bzm = SampleSelfDipoleContribution(sourceMoment, sourcePos, sourceRadius, resolution, origin, cellSize, samplePos - new float3(0, 0, h));
+
+            float3 dBdx = (bxp - bxm) * invDenominator;
+            float3 dBdy = (byp - bym) * invDenominator;
+            float3 dBdz = (bzp - bzm) * invDenominator;
+            return new float3x3(dBdx, dBdy, dBdz);
+        }
+
+        // ────────────────────────────────────────────────────────────────────
         // Bounding-box cell-range iteration helper
         // ────────────────────────────────────────────────────────────────────
 
