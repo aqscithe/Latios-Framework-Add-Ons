@@ -140,15 +140,48 @@ namespace Latios.Anna.Electromagnetism
     }
 
     /// <summary>
-    /// World-space cutoff radius beyond which a dipole source's contribution to
-    /// the grid is skipped. Shared by every source type (permanent magnet,
-    /// electromagnet, future wire segments) so the source-write pass and the
-    /// receiver self-subtraction can use one component regardless of the
-    /// underlying source kind. Cell-count cost per source scales as radius³.
+    /// World-space cutoff radius beyond which a source's contribution to the
+    /// grid is skipped. Shared by every source type (permanent magnet,
+    /// electromagnet, wire segment) so the source-write pass and the receiver
+    /// self-subtraction can use one component regardless of the underlying
+    /// source kind. Cell-count cost per source scales as radius³ for point-like
+    /// dipoles and as (segmentLength + 2·radius)·radius² for wires.
     /// </summary>
     public struct InfluenceRadius : IComponentData
     {
         public float radius;
+    }
+
+    /// <summary>
+    /// A straight finite current-carrying wire segment. Field contribution is
+    /// computed via closed-form Biot-Savart (no numerical integration) on every
+    /// grid cell whose distance to the segment is &lt; <see cref="InfluenceRadius.radius"/>.
+    /// Both endpoints are authored in body-local space and rotated/translated
+    /// to world each substep via the entity's <c>WorldTransform</c>, so a
+    /// dynamic body (e.g. a railgun barrel) can carry a moving wire and a
+    /// static body just keeps its endpoints fixed.
+    ///
+    /// Direction of current is <c>startLocal → endLocal</c> when
+    /// <see cref="currentAmps"/> &gt; 0 (right-hand rule for B); negating the
+    /// current flips the field. Wires are emit-only — they don't carry a
+    /// <c>MagneticDipoleMoment</c> and are skipped by the receiver pass (we
+    /// don't model the F = I L × B Lorentz force on the wire itself, spec §5.3).
+    /// </summary>
+    public struct WireSegment : IComponentData
+    {
+        /// <summary>Start endpoint in body-local space, meters.</summary>
+        public float3 startLocal;
+
+        /// <summary>End endpoint in body-local space, meters.</summary>
+        public float3 endLocal;
+
+        /// <summary>
+        /// Current through the wire in amperes. Runtime-writeable, same pattern
+        /// as <see cref="Electromagnet.currentAmps"/>: gameplay code calls
+        /// <c>SetComponentData</c> and the next substep's source pass picks it
+        /// up. Sign determines the direction of B via the right-hand rule.
+        /// </summary>
+        public float currentAmps;
     }
 
     // =========================================================================

@@ -9,7 +9,7 @@ Analytical dipole sources writing into a dense cell-centered B grid, with ferrom
 | Component | Status |
 |---|---|
 | Field grid | Dense vec3 B at cell centers, fixed scene-anchored bounds |
-| Sources | `PermanentMagnet` (constant dipole), `Electromagnet` (m = N·I·A·n̂, runtime-controllable current) |
+| Sources | `PermanentMagnet` (constant dipole), `Electromagnet` (m = N·I·A·n̂, runtime-controllable current), `WireSegment` (closed-form Biot-Savart, runtime-controllable current) |
 | Receivers | `Ferromagnet` (induced dipole, gets attracted) |
 | Force | F=∇(m·B), τ=m×B (with self-contribution subtracted at sample time) |
 | Anna integration | `AddImpulse` (field-flavor linear + axial-flavor angular) |
@@ -42,8 +42,9 @@ Latios.Anna.Electromagnetism.ElectromagnetismBootstrap.InstallElectromagnetism(w
 2. Add one of the source authoring components to any GameObject:
    - `PermanentMagnetAuthoring` — constant dipole. Set magnitude and local-axis direction.
    - `ElectromagnetAuthoring` — coil-driven dipole. Set turns × area for coil construction, initial current, and the coil-normal direction. Gameplay code controls current at runtime via `SystemAPI.GetComponentRW<Electromagnet>(entity).ValueRW.currentAmps = …` (or `EntityManager.SetComponentData`).
+   - `WireSegmentAuthoring` — straight current-carrying wire. Set both endpoints in body-local space and the initial current; gameplay code dials current at runtime by writing `WireSegment.currentAmps`. Wires don't act as receivers in Tier 2 (no F = I·L×B), so they're emit-only.
 
-   Pair the source with `AnnaRigidBodyAuthoring` if you want it to also be a *receiver* (handheld magnets, magnetic crane arms — anything that should feel reaction force). Omit `AnnaRigidBodyAuthoring` for *static* sources (wall-mounted holding magnets, magnetic door coils, conveyor pads) — they still emit field normally, they just don't feel reaction force.
+   Pair a dipole source (permanent magnet / electromagnet) with `AnnaRigidBodyAuthoring` if you want it to also be a *receiver* (handheld magnets, magnetic crane arms — anything that should feel reaction force). Omit `AnnaRigidBodyAuthoring` for *static* sources (wall-mounted holding magnets, magnetic door coils, conveyor pads) — they still emit field normally, they just don't feel reaction force. Wires default to static.
 3. Add `FerromagnetAuthoring` to any GameObject with `AnnaRigidBodyAuthoring`. Set `μ_r` (relative permeability — iron ~200) and the body's approximate volume.
 
 ### Acceptance tests

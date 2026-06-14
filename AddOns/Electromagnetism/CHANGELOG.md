@@ -6,6 +6,8 @@ All notable changes to this addon are documented here.
 
 ### Added
 
+- Tier 2: `WireSegment` source component — straight current-carrying wire with body-local endpoints. Field contribution computed via closed-form Biot-Savart (no numerical integration) on every grid cell within `InfluenceRadius.radius` of the segment. New `WireSegmentAuthoring` MonoBehaviour, static-by-default (no `AnnaRigidBodyAuthoring` required). Gameplay controls current via `SetComponentData<WireSegment>` — sign flips the field direction. Wires are emit-only in Tier 2 (no Lorentz F = I·L×B on the wire itself, spec §5.3).
+- `EMMath.WireSegmentField` — closed-form Biot-Savart helper for an arbitrary straight segment.
 - Tier 2: `Electromagnet` source component — coil-driven dipole with `m = N·I·A·n̂` derived each substep from runtime-writeable `currentAmps`. New `ElectromagnetAuthoring` MonoBehaviour for scene authoring. Gameplay code controls current via `SetComponentData<Electromagnet>` — sign of current flips the pole, zero collapses the field.
 
 ### Changed

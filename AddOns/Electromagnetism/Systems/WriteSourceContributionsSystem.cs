@@ -11,20 +11,22 @@ using Unity.Mathematics;
 namespace Latios.Anna.Electromagnetism.Systems
 {
     /// <summary>
-    /// Phase B: For every dipole source (permanent magnet or electromagnet),
-    /// compute its world-space dipole moment, store it on
-    /// <see cref="MagneticDipoleMoment"/>, then accumulate its analytical
-    /// dipole field into every grid cell within the source's
-    /// <see cref="InfluenceRadius"/>.
+    /// Phase B: For every source in the scene, accumulate its analytical field
+    /// contribution into the grid over the cells inside the source's
+    /// <see cref="InfluenceRadius"/>. Three source kinds today:
+    /// <see cref="PermanentMagnet"/> and <see cref="Electromagnet"/> deposit a
+    /// dipole field and stamp world-space <see cref="MagneticDipoleMoment"/>
+    /// for the receiver pass; <see cref="WireSegment"/> deposits a
+    /// closed-form Biot-Savart field and has no dipole moment (wires aren't
+    /// receivers in Tier 2).
     ///
-    /// Tier 1 runs single-threaded over sources because multiple sources may
-    /// write to the same cells (e.g., two close magnets) and we want to avoid
-    /// the atomic-write complexity. With ~few sources and ~thousands of cells
-    /// per source this is fine. Tier 2 parallelizes either over sources (with
-    /// atomic accumulation) or over cells (each cell sums contributions from
-    /// all in-range sources, no atomics needed). Two source kinds are handled
-    /// by two jobs chained on <c>state.Dependency</c>; they can't run in
-    /// parallel because they both write the same <c>NativeArray&lt;float3&gt; B</c>.
+    /// Each source kind runs as its own Burst job, single-threaded over
+    /// entities, chained on <c>state.Dependency</c> because all three write
+    /// the same <c>NativeArray&lt;float3&gt; B</c>. Single-threaded keeps
+    /// multiple sources writing to the same cells (two close magnets) free of
+    /// atomic-write complexity; with few sources × thousands of cells per
+    /// source this is fine. Tier 2+ parallelization options are noted in the
+    /// implementation plan §4.
     ///
     /// Self-contribution note: a source writes its own field to nearby cells,
     /// which means a magnet sampling the grid at its own position will see its
@@ -41,6 +43,7 @@ namespace Latios.Anna.Electromagnetism.Systems
         LatiosWorldUnmanaged latiosWorld;
         EntityQuery          _permanentQuery;
         EntityQuery          _electromagnetQuery;
+        EntityQuery          _wireSegmentQuery;
 
         public void OnCreate(ref SystemState state)
         {
@@ -61,20 +64,27 @@ namespace Latios.Anna.Electromagnetism.Systems
                 .With<MagneticDipoleMoment>(false)
                 .Without<EMEffectImmuneTag>()
                 .Build();
+
+            _wireSegmentQuery = state.Fluent()
+                .With<WireSegment>(true)
+                .With<InfluenceRadius>(true)
+                .With<WorldTransform>(true)
+                .Without<EMEffectImmuneTag>()
+                .Build();
         }
 
         public void OnUpdate(ref SystemState state)
         {
             if (!latiosWorld.HasElectromagnetismSettings())
                 return;
-            if (_permanentQuery.IsEmpty && _electromagnetQuery.IsEmpty)
+            if (_permanentQuery.IsEmpty && _electromagnetQuery.IsEmpty && _wireSegmentQuery.IsEmpty)
                 return;
 
             var field = latiosWorld.sceneBlackboardEntity.GetCollectionComponent<ElectromagneticField>(false);
             if (!field.B.IsCreated || field.B.Length == 0)
                 return;
 
-            // Both jobs write the same NativeArray<float3> B with
+            // All three source jobs write the same NativeArray<float3> B with
             // [NativeDisableContainerSafetyRestriction], so they can't run in
             // parallel — chain on state.Dependency.
             var jh = state.Dependency;
@@ -99,6 +109,17 @@ namespace Latios.Anna.Electromagnetism.Systems
                     origin     = field.origin,
                     cellSize   = field.cellSize,
                 }.Schedule(_electromagnetQuery, jh);
+            }
+
+            if (!_wireSegmentQuery.IsEmpty)
+            {
+                jh = new WriteWireSegmentsJob
+                {
+                    B          = field.B,
+                    resolution = field.resolution,
+                    origin     = field.origin,
+                    cellSize   = field.cellSize,
+                }.Schedule(_wireSegmentQuery, jh);
             }
 
             state.Dependency = jh;
@@ -201,6 +222,76 @@ namespace Latios.Anna.Electromagnetism.Systems
                 float3 sourcePos = transform.worldTransform.position;
                 AccumulateDipoleIntoGrid(worldMoment, sourcePos, influence.radius,
                                          resolution, origin, cellSize, B);
+            }
+        }
+
+        /// <summary>
+        /// Wire segments: closed-form Biot-Savart over an AABB(segment, radius)
+        /// bounding region, gated per-cell by distance-to-segment ≤ radius.
+        /// Endpoints are body-local; the entity's <c>WorldTransform</c> applies
+        /// position + rotation + stretch each substep so dynamic wires (mobile
+        /// railgun barrels) and static wires (wall-mounted conduits) share one
+        /// code path. Wires don't write <c>MagneticDipoleMoment</c> — they
+        /// aren't dipoles and aren't receivers.
+        /// </summary>
+        [BurstCompile]
+        partial struct WriteWireSegmentsJob : IJobEntity
+        {
+            [NativeDisableContainerSafetyRestriction] public NativeArray<float3> B;
+
+            public int3   resolution;
+            public float3 origin;
+            public float  cellSize;
+
+            void Execute(in WireSegment     wire,
+                         in InfluenceRadius influence,
+                         in WorldTransform  transform)
+            {
+                if (math.abs(wire.currentAmps) < 1e-6f)
+                    return;
+                if (influence.radius <= 0f)
+                    return;
+
+                // Body-local → world via QVVS: world = position + rotate(local · stretch).
+                var    t          = transform.worldTransform;
+                float3 startWorld = t.position + math.mul(t.rotation, wire.startLocal * t.stretch);
+                float3 endWorld   = t.position + math.mul(t.rotation, wire.endLocal   * t.stretch);
+
+                float3 L     = endWorld - startWorld;
+                float  lenSq = math.lengthsq(L);
+                if (lenSq < 1e-12f)
+                    return;
+
+                float radius   = influence.radius;
+                float radiusSq = radius * radius;
+
+                // Cell AABB enclosing the segment expanded by the influence
+                // radius. Conservative — the per-cell distance check below
+                // discards corner cells outside the swept-capsule region.
+                float3 boundsMin = math.min(startWorld, endWorld) - radius;
+                float3 boundsMax = math.max(startWorld, endWorld) + radius;
+                int3   minCell   = math.clamp((int3)math.floor((boundsMin - origin) / cellSize), 0, resolution - 1);
+                int3   maxCell   = math.clamp((int3)math.floor((boundsMax - origin) / cellSize), 0, resolution - 1);
+
+                for (int z = minCell.z; z <= maxCell.z; z++)
+                for (int y = minCell.y; y <= maxCell.y; y++)
+                for (int x = minCell.x; x <= maxCell.x; x++)
+                {
+                    int3   cell    = new int3(x, y, z);
+                    float3 cellPos = EMMath.CellCenter(cell, origin, cellSize);
+
+                    // Squared distance from cell center to the segment.
+                    float3 toStart = cellPos - startWorld;
+                    float  param   = math.saturate(math.dot(toStart, L) / lenSq);
+                    float3 foot    = startWorld + param * L;
+                    float3 toFoot  = cellPos - foot;
+                    if (math.lengthsq(toFoot) > radiusSq)
+                        continue;
+
+                    float3 contribution = EMMath.WireSegmentField(startWorld, endWorld, wire.currentAmps, cellPos);
+                    int    linear       = EMMath.CellLinearIndex(cell, resolution);
+                    B[linear] += contribution;
+                }
             }
         }
     }

@@ -50,6 +50,53 @@ namespace Latios.Anna.Electromagnetism.Internal
         }
 
         // ────────────────────────────────────────────────────────────────────
+        // Biot-Savart (finite straight wire)
+        // ────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Magnetic flux density at <paramref name="fieldPos"/> produced by a
+        /// straight current-carrying wire segment from <paramref name="segStart"/>
+        /// to <paramref name="segEnd"/>. Closed-form Biot-Savart:
+        /// `B = (μ₀·I / 4π·d) · (sA/|rA| − sB/|rB|) · ϕ̂`
+        /// where d is the perpendicular distance from the field point to the
+        /// infinite line through the segment, rA / rB are vectors from the
+        /// segment endpoints to the field point, sA / sB are their projections
+        /// onto the segment direction, and ϕ̂ = (ℓ̂ × rA) / d is the azimuthal
+        /// unit (right-hand rule with positive current). For an infinite wire
+        /// this reduces to the textbook `(μ₀·I)/(2π·d)·ϕ̂`. Returns zero if the
+        /// segment has zero length or the field point lies on the line
+        /// (singular).
+        /// </summary>
+        public static float3 WireSegmentField(float3 segStart, float3 segEnd, float currentAmps, float3 fieldPos)
+        {
+            float3 L      = segEnd - segStart;
+            float  lenL   = math.length(L);
+            if (lenL < 1e-6f)
+                return float3.zero;
+
+            float3 lHat = L / lenL;
+            float3 rA   = fieldPos - segStart;
+            float3 rB   = fieldPos - segEnd;
+
+            float  sA   = math.dot(rA, lHat);
+            float  sB   = math.dot(rB, lHat);
+
+            float3 perp = rA - sA * lHat;
+            float  d    = math.length(perp);
+            if (d < 1e-6f)
+                return float3.zero;
+
+            // ϕ̂ = (ℓ̂ × rA) / d. (ℓ̂ × rA) = ℓ̂ × (perp + sA·ℓ̂) = ℓ̂ × perp, which has magnitude d.
+            float3 phiHat = math.cross(lHat, perp) / d;
+
+            float magA = math.length(rA);
+            float magB = math.length(rB);
+            float scale = Mu0Over4Pi * currentAmps * (sA / magA - sB / magB) / d;
+
+            return phiHat * scale;
+        }
+
+        // ────────────────────────────────────────────────────────────────────
         // Grid addressing
         // ────────────────────────────────────────────────────────────────────
 
