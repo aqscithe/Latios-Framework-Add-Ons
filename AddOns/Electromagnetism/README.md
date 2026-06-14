@@ -2,16 +2,16 @@
 
 A quasi-static electromagnetic field simulation built on top of Anna Physics. Magnets and ferromagnetic objects exchange force/torque through a shared voxel field grid. Magnetic forces combine with gravity and contact forces via Anna's solver — no special integration required.
 
-## Tier 1 scope
+## Scope
 
-Tier 1 ships analytical dipole sources writing into a dense cell-centered B grid, with ferromagnetic receivers sampling the grid and applying force `F = ∇(m·B)` and torque `τ = m × B` via Anna's `AddImpulse` buffer.
+Analytical dipole sources writing into a dense cell-centered B grid, with ferromagnetic receivers sampling the grid and applying force `F = ∇(m·B)` and torque `τ = m × B` via Anna's `AddImpulse` buffer.
 
-| Component | Tier 1 |
+| Component | Status |
 |---|---|
 | Field grid | Dense vec3 B at cell centers, fixed scene-anchored bounds |
-| Sources | `PermanentMagnet` (constant dipole) |
+| Sources | `PermanentMagnet` (constant dipole), `Electromagnet` (m = N·I·A·n̂, runtime-controllable current) |
 | Receivers | `Ferromagnet` (induced dipole, gets attracted) |
-| Force | F=∇(m·B), τ=m×B |
+| Force | F=∇(m·B), τ=m×B (with self-contribution subtracted at sample time) |
 | Anna integration | `AddImpulse` (field-flavor linear + axial-flavor angular) |
 | Bake / induction / GPU viz | Deferred |
 
@@ -39,12 +39,17 @@ Latios.Anna.Electromagnetism.ElectromagnetismBootstrap.InstallElectromagnetism(w
 ### Authoring a scene
 
 1. Add an `ElectromagnetismSettingsAuthoring` to any GameObject in the scene's subscene. This defines the grid's bounds, cell size, and global tuning. Without it, no grid is allocated and no EM systems run.
-2. Add `PermanentMagnetAuthoring` to any GameObject with `AnnaRigidBodyAuthoring`. Set the dipole moment magnitude and the local-axis direction.
+2. Add one of the source authoring components to any GameObject:
+   - `PermanentMagnetAuthoring` — constant dipole. Set magnitude and local-axis direction.
+   - `ElectromagnetAuthoring` — coil-driven dipole. Set turns × area for coil construction, initial current, and the coil-normal direction. Gameplay code controls current at runtime via `SystemAPI.GetComponentRW<Electromagnet>(entity).ValueRW.currentAmps = …` (or `EntityManager.SetComponentData`).
+
+   Pair the source with `AnnaRigidBodyAuthoring` if you want it to also be a *receiver* (handheld magnets, magnetic crane arms — anything that should feel reaction force). Omit `AnnaRigidBodyAuthoring` for *static* sources (wall-mounted holding magnets, magnetic door coils, conveyor pads) — they still emit field normally, they just don't feel reaction force.
 3. Add `FerromagnetAuthoring` to any GameObject with `AnnaRigidBodyAuthoring`. Set `μ_r` (relative permeability — iron ~200) and the body's approximate volume.
 
-### Acceptance test for Tier 1
+### Acceptance tests
 
-A `PermanentMagnetAuthoring` item near a `FerromagnetAuthoring` item: the ferromagnet should accelerate toward the magnet and orient its long axis to align with the local field. Two permanent magnets should attract / repel based on relative orientation and rotate to align.
+- A `PermanentMagnetAuthoring` item near a `FerromagnetAuthoring` item: the ferromagnet should accelerate toward the magnet and orient its long axis to align with the local field. Two permanent magnets should attract / repel based on relative orientation and rotate to align.
+- An `ElectromagnetAuthoring` item near a `FerromagnetAuthoring` item with positive initial current: behaves like a permanent magnet. Toggle the current sign at runtime and the pole flips; set to zero and the field collapses.
 
 ## Math notes
 

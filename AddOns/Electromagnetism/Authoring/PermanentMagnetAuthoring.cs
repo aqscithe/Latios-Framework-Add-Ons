@@ -6,14 +6,17 @@ using UnityEngine;
 namespace Latios.Anna.Electromagnetism.Authoring
 {
     /// <summary>
-    /// Marks a body as a permanent magnet. Requires
-    /// <see cref="AnnaRigidBodyAuthoring"/> so the body has the
-    /// <c>RigidBody</c> + <c>AddImpulse</c> components needed to both receive
-    /// reaction forces from other magnets and write its dipole field into the
-    /// grid via its world-rotation pose.
+    /// Marks a body as a permanent magnet.
+    ///
+    /// Pair with <see cref="AnnaRigidBodyAuthoring"/> for a *dynamic* magnet
+    /// (handheld neodymium, magnetic ammo, anything that needs to feel
+    /// reaction force from other sources). Omit it for a *static* magnet
+    /// (a fixed bar magnet glued to a wall, a magnetic strip embedded in
+    /// the floor) — the field-emit path doesn't need a rigid body, only the
+    /// reaction-force path does. Static magnets still drive every other
+    /// receiver in the scene normally.
     /// </summary>
     [AddComponentMenu("Latios/Anna/Permanent Magnet")]
-    [RequireComponent(typeof(AnnaRigidBodyAuthoring))]
     public class PermanentMagnetAuthoring : MonoBehaviour
     {
         [Header("Dipole moment (body-local)")]
@@ -78,7 +81,10 @@ namespace Latios.Anna.Electromagnetism.Authoring
             {
                 localMoment     = localMoment,
                 curieScale      = (half)authoring.curieScale,
-                influenceRadius = authoring.influenceRadius,
+            });
+            AddComponent(entity, new InfluenceRadius
+            {
+                radius = authoring.influenceRadius,
             });
 
             // Permanents are also receivers (they feel each other's fields),

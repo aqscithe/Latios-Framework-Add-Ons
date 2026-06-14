@@ -110,13 +110,45 @@ namespace Latios.Anna.Electromagnetism
         /// this from a thermal state.
         /// </summary>
         public half curieScale;
+    }
+
+    /// <summary>
+    /// An electromagnet — a coil whose dipole moment is derived from its current
+    /// each substep: <c>m = N · I · A · n̂_world</c>. The current
+    /// <see cref="currentAmps"/> is gameplay-writeable at runtime: any system can
+    /// just <c>SetComponentData</c> a new value and the next substep's source
+    /// pass picks it up. N · A is treated as a constant (coil construction
+    /// doesn't change), so designers author "this is what 1 A produces" via
+    /// turns × cross-section area, and gameplay dials the strength via current.
+    /// </summary>
+    public struct Electromagnet : IComponentData
+    {
+        /// <summary>Current through the coil in amperes. Runtime-writeable.</summary>
+        public float currentAmps;
+
+        /// <summary>Number of turns N. Treated as a coil construction constant.</summary>
+        public float turns;
+
+        /// <summary>Cross-section area A in m². Coil construction constant.</summary>
+        public float crossSectionArea;
 
         /// <summary>
-        /// World-space radius beyond which this source's contribution is
-        /// considered negligible and is not written to the grid. Tier 1: set
-        /// in authoring. Tier 2 will auto-compute from |m| and a |B| threshold.
+        /// Coil-normal direction in body-local space (right-hand rule with
+        /// positive current). Will be normalized by the source-write pass.
         /// </summary>
-        public float influenceRadius;
+        public float3 coilNormalLocal;
+    }
+
+    /// <summary>
+    /// World-space cutoff radius beyond which a dipole source's contribution to
+    /// the grid is skipped. Shared by every source type (permanent magnet,
+    /// electromagnet, future wire segments) so the source-write pass and the
+    /// receiver self-subtraction can use one component regardless of the
+    /// underlying source kind. Cell-count cost per source scales as radius³.
+    /// </summary>
+    public struct InfluenceRadius : IComponentData
+    {
+        public float radius;
     }
 
     // =========================================================================
