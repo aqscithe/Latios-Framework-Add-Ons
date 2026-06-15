@@ -41,6 +41,24 @@ namespace Latios.Anna.Electromagnetism.Authoring
         [Min(0f)]
         public float globalForceScale = 1f;
 
+        [Header("Permeability propagation (Phase C)")]
+        [Tooltip("Jacobi iterations of the permeability propagation pass. 0 = " +
+                 "disabled — the source-write output is what receivers sample " +
+                 "(Tier 1 behaviour). 2–4 lets high-μ_r geometry channel flux " +
+                 "further from its surfaces. Each iteration is one parallel " +
+                 "pass over every cell; cost scales linearly. Set this above 0 " +
+                 "only when the scene actually has iron / steel voxel walls " +
+                 "you want to bend the field.")]
+        [Range(0, 8)]
+        public int propagationIterations = 0;
+
+        [Tooltip("Diffusion blend per iteration in [0,1]. 0 = no change; 1 = " +
+                 "pure neighbour average. 0.7 lets each iteration propagate " +
+                 "roughly one cell while keeping near-source values honest. " +
+                 "Higher values smooth the source positions more aggressively.")]
+        [Range(0f, 1f)]
+        public float propagationBlend = 0.7f;
+
         void OnDrawGizmosSelected()
         {
             // Visualize the grid bounds so the designer can see what region
@@ -59,10 +77,12 @@ namespace Latios.Anna.Electromagnetism.Authoring
             var entity = GetEntity(TransformUsageFlags.None);
             AddComponent(entity, new ElectromagnetismSettings
             {
-                gridOrigin       = (float3)(Vector3)authoring.gridOrigin,
-                gridResolution   = new int3(authoring.gridResolution.x, authoring.gridResolution.y, authoring.gridResolution.z),
-                cellSize         = authoring.cellSize,
-                globalForceScale = authoring.globalForceScale,
+                gridOrigin            = (float3)(Vector3)authoring.gridOrigin,
+                gridResolution        = new int3(authoring.gridResolution.x, authoring.gridResolution.y, authoring.gridResolution.z),
+                cellSize              = authoring.cellSize,
+                globalForceScale      = authoring.globalForceScale,
+                propagationIterations = authoring.propagationIterations,
+                propagationBlend      = authoring.propagationBlend,
             });
         }
     }

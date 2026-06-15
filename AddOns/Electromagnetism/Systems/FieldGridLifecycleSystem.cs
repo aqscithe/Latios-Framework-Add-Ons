@@ -62,6 +62,7 @@ namespace Latios.Anna.Electromagnetism.Systems
             var fresh = new ElectromagneticField
             {
                 B          = new NativeArray<float3>(cellCount, Allocator.Persistent, NativeArrayOptions.ClearMemory),
+                Btemp      = new NativeArray<float3>(cellCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
                 muR        = new NativeArray<half>(cellCount,  Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
                 sigma      = new NativeArray<half>(cellCount,  Allocator.Persistent, NativeArrayOptions.ClearMemory),
                 resolution = settings.gridResolution,

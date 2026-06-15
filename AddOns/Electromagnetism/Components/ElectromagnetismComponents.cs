@@ -32,6 +32,26 @@ namespace Latios.Anna.Electromagnetism
         /// </summary>
         public float globalForceScale;
 
+        /// <summary>
+        /// Number of Jacobi iterations for the Phase C permeability propagation
+        /// pass. 0 disables propagation entirely — the source-write output is
+        /// what receivers sample (the Tier 1 behaviour). Higher values let
+        /// high-μ_r geometry channel flux further from its surfaces, at a
+        /// linear cost per iteration. 2–4 is a good range for most scenes;
+        /// going higher mostly smooths the source positions without changing
+        /// the qualitative concentration around iron.
+        /// </summary>
+        public int propagationIterations;
+
+        /// <summary>
+        /// Diffusion blend per Jacobi iteration in [0,1]. 0 = no diffusion
+        /// (B unchanged); 1 = pure Jacobi neighbour-average (no preservation
+        /// of pre-iteration cell value). 0.7 default lets each iteration step
+        /// roughly one cell of propagation while keeping near-source values
+        /// honest.
+        /// </summary>
+        public float propagationBlend;
+
         public float3 GridSizeMeters => (float3)gridResolution * cellSize;
         public int    CellCount      => gridResolution.x * gridResolution.y * gridResolution.z;
     }
@@ -53,6 +73,14 @@ namespace Latios.Anna.Electromagnetism
     {
         /// <summary>Magnetic flux density per cell, Tesla. Length = cellCount.</summary>
         public NativeArray<float3> B;
+
+        /// <summary>
+        /// Scratch buffer used by Phase C propagation (Jacobi iterations
+        /// between this and <see cref="B"/>). Length = cellCount. Persistent
+        /// — same lifecycle as <see cref="B"/>. Contents are scratch between
+        /// substeps; never read outside the propagation system.
+        /// </summary>
+        public NativeArray<float3> Btemp;
 
         /// <summary>
         /// Relative permeability per cell. Length = cellCount. Tier 2+: ferromagnetic
@@ -81,6 +109,7 @@ namespace Latios.Anna.Electromagnetism
         public JobHandle TryDispose(JobHandle inputDeps)
         {
             if (B.IsCreated)     inputDeps = B.Dispose(inputDeps);
+            if (Btemp.IsCreated) inputDeps = Btemp.Dispose(inputDeps);
             if (muR.IsCreated)   inputDeps = muR.Dispose(inputDeps);
             if (sigma.IsCreated) inputDeps = sigma.Dispose(inputDeps);
             return inputDeps;

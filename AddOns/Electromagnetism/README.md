@@ -10,6 +10,7 @@ Analytical dipole sources writing into a dense cell-centered B grid, with ferrom
 |---|---|
 | Field grid | Dense vec3 B at cell centers, fixed scene-anchored bounds |
 | Sources | `PermanentMagnet` (constant dipole), `Electromagnet` (m = N·I·A·n̂, runtime-controllable current), `WireSegment` (closed-form Biot-Savart, runtime-controllable current) |
+| Permeability propagation | `PropagatePermeabilitySystem` — μ_r-weighted Jacobi diffusion. Off by default (`propagationIterations = 0`); set 2–4 iterations on `ElectromagnetismSettings` to enable iron-walls-bend-the-field gameplay. Requires the project's voxel-to-grid μ_r stamp pass to populate `ElectromagneticField.muR`. |
 | Receivers | `Ferromagnet` (induced dipole, gets attracted) |
 | Force | F=∇(m·B), τ=m×B (with self-contribution subtracted at sample time) |
 | Anna integration | `AddImpulse` (field-flavor linear + axial-flavor angular) |
