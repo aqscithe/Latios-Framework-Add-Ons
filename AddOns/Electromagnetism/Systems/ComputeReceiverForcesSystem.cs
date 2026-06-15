@@ -54,6 +54,7 @@ namespace Latios.Anna.Electromagnetism.Systems
                 .With<WorldTransform>(true)
                 .With<RigidBody>(true)
                 .With<AddImpulse>(false)
+                .With<MagneticFeedback>(false)
                 .Without<Ferromagnet>()
                 .Without<EMEffectImmuneTag>()
                 .Build();
@@ -64,6 +65,7 @@ namespace Latios.Anna.Electromagnetism.Systems
                 .With<WorldTransform>(true)
                 .With<RigidBody>(true)
                 .With<AddImpulse>(false)
+                .With<MagneticFeedback>(false)
                 .Without<EMEffectImmuneTag>()
                 .Build();
         }
@@ -118,20 +120,17 @@ namespace Latios.Anna.Electromagnetism.Systems
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // Shared force-application logic (inlined so both jobs share the same
-        // F/τ formulation and the same impulse-encoding for AddImpulse).
+        // Shared impulse-encoding helper. Callers compute the pre-impulse F
+        // and τ themselves (and write them to MagneticFeedback for debug viz)
+        // before invoking this — keeping the impulse encoding here means both
+        // receiver jobs share one source of truth for the AddImpulse encoding
+        // convention.
         // ────────────────────────────────────────────────────────────────────
 
-        static void AppendForceAndTorque(float3 moment,
-                                         float3 B_sample,
-                                         float3x3 gradB,
-                                         float dt,
-                                         float forceScale,
-                                         ref DynamicBuffer<AddImpulse> impulses)
+        static void AppendImpulses(float3 force, float3 torque,
+                                   float dt, float forceScale,
+                                   ref DynamicBuffer<AddImpulse> impulses)
         {
-            float3 force   = EMMath.DipoleForce(moment,   gradB);
-            float3 torque  = EMMath.DipoleTorque(moment, B_sample);
-
             float3 linearImpulse  = force  * dt * forceScale;
             float3 angularImpulse = torque * dt * forceScale;
 
@@ -170,10 +169,15 @@ namespace Latios.Anna.Electromagnetism.Systems
             void Execute(in InfluenceRadius       influence,
                          in WorldTransform        transform,
                          in MagneticDipoleMoment  moment,
+                         ref MagneticFeedback     feedback,
                          ref DynamicBuffer<AddImpulse> impulses)
             {
                 if (math.lengthsq(moment.worldMoment) < 1e-12f)
+                {
+                    feedback.force  = float3.zero;
+                    feedback.torque = float3.zero;
                     return;
+                }
 
                 float3   pos    = transform.worldTransform.position;
                 float3   Bhere  = EMMath.SampleB(in B, resolution, origin, cellSize, pos);
@@ -192,7 +196,12 @@ namespace Latios.Anna.Electromagnetism.Systems
                     moment.worldMoment, pos, influence.radius,
                     resolution, origin, cellSize, pos);
 
-                AppendForceAndTorque(moment.worldMoment, Bhere, gradB, dt, forceScale, ref impulses);
+                float3 force  = EMMath.DipoleForce(moment.worldMoment,  gradB);
+                float3 torque = EMMath.DipoleTorque(moment.worldMoment, Bhere);
+                feedback.force  = force;
+                feedback.torque = torque;
+
+                AppendImpulses(force, torque, dt, forceScale, ref impulses);
             }
         }
 
@@ -213,6 +222,7 @@ namespace Latios.Anna.Electromagnetism.Systems
             void Execute(in Ferromagnet           ferro,
                          in WorldTransform        transform,
                          ref MagneticDipoleMoment moment,
+                         ref MagneticFeedback     feedback,
                          ref DynamicBuffer<AddImpulse> impulses)
             {
                 float3 pos   = transform.worldTransform.position;
@@ -224,6 +234,8 @@ namespace Latios.Anna.Electromagnetism.Systems
                 if (Bmag < 1e-9f)
                 {
                     moment.worldMoment = float3.zero;
+                    feedback.force     = float3.zero;
+                    feedback.torque    = float3.zero;
                     return;
                 }
 
@@ -247,7 +259,13 @@ namespace Latios.Anna.Electromagnetism.Systems
                 moment.worldMoment = inducedMoment;
 
                 float3x3 gradB = EMMath.GradientB(in B, resolution, origin, cellSize, pos);
-                AppendForceAndTorque(inducedMoment, Bhere, gradB, dt, forceScale, ref impulses);
+
+                float3 force  = EMMath.DipoleForce(inducedMoment,  gradB);
+                float3 torque = EMMath.DipoleTorque(inducedMoment, Bhere);
+                feedback.force  = force;
+                feedback.torque = torque;
+
+                AppendImpulses(force, torque, dt, forceScale, ref impulses);
             }
         }
     }

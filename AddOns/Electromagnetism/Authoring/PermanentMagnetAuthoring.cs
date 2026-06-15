@@ -94,6 +94,10 @@ namespace Latios.Anna.Electromagnetism.Authoring
             {
                 worldMoment = float3.zero,
             });
+            // Telemetry channel: ComputeReceiverForcesSystem writes the
+            // last-substep F and τ here so debug viz can draw arrows
+            // without recomputing.
+            AddComponent(entity, default(MagneticFeedback));
         }
     }
 }

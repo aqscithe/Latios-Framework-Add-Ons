@@ -114,6 +114,8 @@ namespace Latios.Anna.Electromagnetism.Authoring
             {
                 worldMoment = float3.zero,
             });
+            // Telemetry channel for debug viz arrows.
+            AddComponent(entity, default(MagneticFeedback));
         }
     }
 }

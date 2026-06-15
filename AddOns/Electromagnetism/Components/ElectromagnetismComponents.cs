@@ -238,4 +238,25 @@ namespace Latios.Anna.Electromagnetism
     /// of <c>GravityEffectImmuneTag</c> from the project's core components.
     /// </summary>
     public struct EMEffectImmuneTag : IComponentData { }
+
+    /// <summary>
+    /// Per-receiver telemetry — the last-substep magnetic force and torque
+    /// computed by <c>ComputeReceiverForcesSystem</c>, in pre-impulse units
+    /// (Newtons / Newton-metres). Populated by every receiver body each
+    /// substep so debug visualization can draw force/torque arrows without
+    /// re-computing F = ∇(m·B) and τ = m × B on the CPU side.
+    ///
+    /// Force and torque are stored *before* the per-substep dt multiplier and
+    /// the <c>ElectromagnetismSettings.globalForceScale</c> are applied — so
+    /// arrow lengths reflect the physical Newtons / Newton-metres a designer
+    /// would reason about, not the impulse magnitudes actually fed to Anna.
+    /// </summary>
+    public struct MagneticFeedback : IComponentData
+    {
+        /// <summary>Newtons. <c>F = ∇(m·B)</c> at the body's centre, before the dt × globalForceScale conversion to impulse.</summary>
+        public float3 force;
+
+        /// <summary>Newton-metres. <c>τ = m × B</c> at the body's centre, before the dt × globalForceScale conversion to angular impulse.</summary>
+        public float3 torque;
+    }
 }
