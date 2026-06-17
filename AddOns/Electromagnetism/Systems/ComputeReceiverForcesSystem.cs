@@ -57,6 +57,7 @@ namespace Latios.Anna.Electromagnetism.Systems
                 .With<MagneticFeedback>(false)
                 .Without<Ferromagnet>()
                 .Without<EMEffectImmuneTag>()
+                .Without<ElectromagneticBypassTag>()
                 .Build();
 
             _ferromagnetReceiverQuery = state.Fluent()
@@ -67,6 +68,7 @@ namespace Latios.Anna.Electromagnetism.Systems
                 .With<AddImpulse>(false)
                 .With<MagneticFeedback>(false)
                 .Without<EMEffectImmuneTag>()
+                .Without<ElectromagneticBypassTag>()
                 .Build();
         }
 
@@ -80,8 +82,10 @@ namespace Latios.Anna.Electromagnetism.Systems
             if (!field.B.IsCreated || field.B.Length == 0)
                 return;
 
-            float dt          = state.WorldUnmanaged.Time.DeltaTime;
-            float forceScale  = settings.globalForceScale;
+            float dt             = state.WorldUnmanaged.Time.DeltaTime;
+            float forceScale     = settings.globalForceScale;
+            float torqueScale    = settings.globalTorqueScale;
+            float maxLinearAccel = settings.maxLinearAcceleration;
 
             // Chain order matters: the ferromagnet job writes MagneticDipoleMoment
             // (the induced moment for each ferro receiver), and the dipole-source
@@ -94,12 +98,14 @@ namespace Latios.Anna.Electromagnetism.Systems
             {
                 jh = new DipoleSourceReceiverJob
                 {
-                    B          = field.B,
-                    resolution = field.resolution,
-                    origin     = field.origin,
-                    cellSize   = field.cellSize,
-                    dt         = dt,
-                    forceScale = forceScale,
+                    B              = field.B,
+                    resolution     = field.resolution,
+                    origin         = field.origin,
+                    cellSize       = field.cellSize,
+                    dt             = dt,
+                    forceScale     = forceScale,
+                    torqueScale    = torqueScale,
+                    maxLinearAccel = maxLinearAccel,
                 }.ScheduleParallel(_dipoleSourceReceiverQuery, jh);
             }
 
@@ -107,12 +113,14 @@ namespace Latios.Anna.Electromagnetism.Systems
             {
                 jh = new FerromagnetReceiverJob
                 {
-                    B          = field.B,
-                    resolution = field.resolution,
-                    origin     = field.origin,
-                    cellSize   = field.cellSize,
-                    dt         = dt,
-                    forceScale = forceScale,
+                    B              = field.B,
+                    resolution     = field.resolution,
+                    origin         = field.origin,
+                    cellSize       = field.cellSize,
+                    dt             = dt,
+                    forceScale     = forceScale,
+                    torqueScale    = torqueScale,
+                    maxLinearAccel = maxLinearAccel,
                 }.ScheduleParallel(_ferromagnetReceiverQuery, jh);
             }
 
@@ -128,11 +136,27 @@ namespace Latios.Anna.Electromagnetism.Systems
         // ────────────────────────────────────────────────────────────────────
 
         static void AppendImpulses(float3 force, float3 torque,
-                                   float dt, float forceScale,
+                                   float dt, float forceScale, float torqueScale,
+                                   float inverseMass, float maxLinearAccel,
                                    ref DynamicBuffer<AddImpulse> impulses)
         {
-            float3 linearImpulse  = force  * dt * forceScale;
-            float3 angularImpulse = torque * dt * forceScale;
+            float3 scaledForce = force * forceScale;
+
+            // Acceleration ceiling regularizes the 1/r⁴ gradient singularity
+            // near contact. Without this, the final substep before two bodies
+            // touch deposits an unbounded impulse, Anna's collision flip turns
+            // the overshoot into separation velocity, and the pair flies apart
+            // instead of sticking. Skip for infinite-mass bodies (the clamp
+            // would be meaningless) and when disabled (maxLinearAccel <= 0).
+            if (maxLinearAccel > 0f && inverseMass > 0f)
+            {
+                float accelMag = math.length(scaledForce) * inverseMass;
+                if (accelMag > maxLinearAccel)
+                    scaledForce *= maxLinearAccel / accelMag;
+            }
+
+            float3 linearImpulse  = scaledForce * dt;
+            float3 angularImpulse = torque * dt * torqueScale;
 
             // Linear: AddImpulse(fieldImpulse) — applied at COM, no torque.
             if (math.lengthsq(linearImpulse) > 1e-20f)
@@ -165,10 +189,13 @@ namespace Latios.Anna.Electromagnetism.Systems
             public float  cellSize;
             public float  dt;
             public float  forceScale;
+            public float  torqueScale;
+            public float  maxLinearAccel;
 
             void Execute(in InfluenceRadius       influence,
                          in WorldTransform        transform,
                          in MagneticDipoleMoment  moment,
+                         in RigidBody             body,
                          ref MagneticFeedback     feedback,
                          ref DynamicBuffer<AddImpulse> impulses)
             {
@@ -201,7 +228,8 @@ namespace Latios.Anna.Electromagnetism.Systems
                 feedback.force  = force;
                 feedback.torque = torque;
 
-                AppendImpulses(force, torque, dt, forceScale, ref impulses);
+                AppendImpulses(force, torque, dt, forceScale, torqueScale,
+                               body.inverseMass, maxLinearAccel, ref impulses);
             }
         }
 
@@ -218,9 +246,12 @@ namespace Latios.Anna.Electromagnetism.Systems
             public float  cellSize;
             public float  dt;
             public float  forceScale;
+            public float  torqueScale;
+            public float  maxLinearAccel;
 
             void Execute(in Ferromagnet           ferro,
                          in WorldTransform        transform,
+                         in RigidBody             body,
                          ref MagneticDipoleMoment moment,
                          ref MagneticFeedback     feedback,
                          ref DynamicBuffer<AddImpulse> impulses)
@@ -265,7 +296,8 @@ namespace Latios.Anna.Electromagnetism.Systems
                 feedback.force  = force;
                 feedback.torque = torque;
 
-                AppendImpulses(force, torque, dt, forceScale, ref impulses);
+                AppendImpulses(force, torque, dt, forceScale, torqueScale,
+                               body.inverseMass, maxLinearAccel, ref impulses);
             }
         }
     }

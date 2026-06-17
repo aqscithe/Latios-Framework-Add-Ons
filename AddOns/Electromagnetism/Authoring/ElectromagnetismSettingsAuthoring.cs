@@ -33,13 +33,38 @@ namespace Latios.Anna.Electromagnetism.Authoring
         public float cellSize = 0.1f;
 
         [Header("Gameplay tuning")]
-        [Tooltip("Multiplies all magnetic forces and torques at the final-write " +
-                 "step. 1.0 = realistic. Realistic permanent magnets at game " +
-                 "scale produce very weak forces (~μN at 1m), so this knob " +
-                 "exists to make a 1 A·m² hand-magnet feel impactful without " +
-                 "authoring physically-unrealistic dipole moments.")]
+        [Tooltip("Multiplies magnetic linear forces (F = ∇(m·B)) at the final " +
+                 "impulse-write step. 1.0 = realistic. Realistic permanent " +
+                 "magnets at game scale produce very weak forces (~μN at 1m), " +
+                 "so this knob exists to make a 1 A·m² hand-magnet feel " +
+                 "impactful without authoring physically-unrealistic dipole " +
+                 "moments.")]
         [Min(0f)]
         public float globalForceScale = 1f;
+
+        [Tooltip("Multiplies magnetic torques (τ = m × B) at the final " +
+                 "impulse-write step, decoupled from Global Force Scale so " +
+                 "translation and rotation can be tuned independently. Raising " +
+                 "Global Force Scale for game-feel also stacks angular impulses " +
+                 "each substep, which makes magnets whip into uncontrolled " +
+                 "spin — dial this down (e.g. 0.05–0.2) to keep alignment " +
+                 "without spin-out. 1.0 = same scale as force.")]
+        [Min(0f)]
+        public float globalTorqueScale = 1f;
+
+        [Tooltip("Per-body ceiling on the linear acceleration (m/s²) magnetic " +
+                 "force can produce in a single substep. 0 = disabled (no " +
+                 "clamp; existing scenes unchanged). The dipole field gradient " +
+                 "falls as 1/r⁴, so two bodies right before contact deposit an " +
+                 "unbounded impulse, Anna's collision flip converts that " +
+                 "overshoot into separation velocity, and the pair flies apart " +
+                 "instead of sticking. This clamp caps how much velocity " +
+                 "magnetism can add per substep, regularizing the singularity " +
+                 "without changing behaviour at meaningful distances. " +
+                 "Suggested starting value: 50–200 (≈ 5–20 g) for typical " +
+                 "hand-magnet scenarios.")]
+        [Min(0f)]
+        public float maxLinearAcceleration = 0f;
 
         [Header("Permeability propagation (Phase C)")]
         [Tooltip("Jacobi iterations of the permeability propagation pass. 0 = " +
@@ -81,6 +106,8 @@ namespace Latios.Anna.Electromagnetism.Authoring
                 gridResolution        = new int3(authoring.gridResolution.x, authoring.gridResolution.y, authoring.gridResolution.z),
                 cellSize              = authoring.cellSize,
                 globalForceScale      = authoring.globalForceScale,
+                globalTorqueScale     = authoring.globalTorqueScale,
+                maxLinearAcceleration = authoring.maxLinearAcceleration,
                 propagationIterations = authoring.propagationIterations,
                 propagationBlend      = authoring.propagationBlend,
             });

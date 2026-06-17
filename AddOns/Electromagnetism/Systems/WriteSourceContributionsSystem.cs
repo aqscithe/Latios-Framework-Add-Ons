@@ -55,6 +55,7 @@ namespace Latios.Anna.Electromagnetism.Systems
                 .With<WorldTransform>(true)
                 .With<MagneticDipoleMoment>(false)
                 .Without<EMEffectImmuneTag>()
+                .Without<ElectromagneticBypassTag>()
                 .Build();
 
             _electromagnetQuery = state.Fluent()
@@ -63,6 +64,7 @@ namespace Latios.Anna.Electromagnetism.Systems
                 .With<WorldTransform>(true)
                 .With<MagneticDipoleMoment>(false)
                 .Without<EMEffectImmuneTag>()
+                .Without<ElectromagneticBypassTag>()
                 .Build();
 
             _wireSegmentQuery = state.Fluent()
@@ -70,6 +72,7 @@ namespace Latios.Anna.Electromagnetism.Systems
                 .With<InfluenceRadius>(true)
                 .With<WorldTransform>(true)
                 .Without<EMEffectImmuneTag>()
+                .Without<ElectromagneticBypassTag>()
                 .Build();
         }
 

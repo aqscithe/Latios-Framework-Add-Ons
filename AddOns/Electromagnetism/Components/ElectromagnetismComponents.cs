@@ -26,11 +26,39 @@ namespace Latios.Anna.Electromagnetism
         public float cellSize;
 
         /// <summary>
-        /// Global multiplier applied to all magnetic forces and torques at the
-        /// final-write step. Use this to dial up gameplay impact without
+        /// Global multiplier applied to magnetic linear forces at the final
+        /// impulse-write step. Use this to dial up gameplay impact without
         /// authoring physically-unrealistic dipole moments. 1.0 = realistic.
         /// </summary>
         public float globalForceScale;
+
+        /// <summary>
+        /// Global multiplier applied to magnetic torques (τ = m × B) at the
+        /// final impulse-write step, decoupled from <see cref="globalForceScale"/>
+        /// so translational and rotational response can be tuned independently.
+        /// At realistic scale, dipole bodies receive enough torque to align with
+        /// the field over many substeps, but the per-substep angular impulses
+        /// stack when the force scale is raised for game-feel — separating the
+        /// two lets a designer pull translation up without bodies whipping into
+        /// uncontrolled spin. 1.0 = use the same scale as force.
+        /// </summary>
+        public float globalTorqueScale;
+
+        /// <summary>
+        /// Per-body ceiling on the linear acceleration magnetic force can
+        /// produce per substep, in m/s². 0 (default) disables the clamp.
+        /// The dipole field falls as <c>1/r³</c> and its gradient as
+        /// <c>1/r⁴</c>; without a clamp, two bodies touching deposit an
+        /// unbounded impulse at the moment of contact, Anna's collision flip
+        /// converts that overshoot into separation velocity, and the pair
+        /// flies apart instead of sticking. Capping acceleration is the
+        /// standard regularization for stiff-attractive-force-into-contact
+        /// — the body still feels the full pull at meaningful distances but
+        /// can't accumulate impulse faster than it can integrate. Skipped for
+        /// infinite-mass bodies (<c>inverseMass == 0</c>) and disabled at 0.
+        /// Suggested starting value: 50–200 (~5–20g) for typical magnets.
+        /// </summary>
+        public float maxLinearAcceleration;
 
         /// <summary>
         /// Number of Jacobi iterations for the Phase C permeability propagation
@@ -269,6 +297,31 @@ namespace Latios.Anna.Electromagnetism
     public struct EMEffectImmuneTag : IComponentData { }
 
     /// <summary>
+    /// Full opt-out tag. A source entity (<see cref="PermanentMagnet"/>,
+    /// <see cref="Electromagnet"/>, or <see cref="WireSegment"/>) carrying
+    /// this tag is skipped by both <c>WriteSourceContributionsSystem</c> AND
+    /// <c>ComputeReceiverForcesSystem</c> — for this substep, the entity
+    /// neither writes its field contribution into the grid nor samples force
+    /// from the field on the receiver side. The source's
+    /// <c>MagneticDipoleMoment.worldMoment</c> is left untouched; it resumes
+    /// from its last known value as soon as the tag is removed.
+    ///
+    /// <para>Differs from <see cref="EMEffectImmuneTag"/> in intent —
+    /// <c>EMEffectImmuneTag</c> is "permanently outside the EM simulation"
+    /// (authoring choice). <c>ElectromagneticBypassTag</c> is "temporarily
+    /// driven by some other system" (runtime toggle).</para>
+    ///
+    /// <para>Intended consumer: gameplay systems that take over a source's
+    /// behaviour for the duration of an ability — e.g. a magnet carried by a
+    /// grav-gun ability driving its own gameplay-curve force application
+    /// directly, with the underlying physics emit and the carrier's own EM
+    /// response suspended. Adding the tag at ability start and removing it
+    /// on ability end gives a clean hand-off: the source rejoins the
+    /// simulation the next substep with no teardown / re-init.</para>
+    /// </summary>
+    public struct ElectromagneticBypassTag : IComponentData { }
+
+    /// <summary>
     /// Per-receiver telemetry — the last-substep magnetic force and torque
     /// computed by <c>ComputeReceiverForcesSystem</c>, in pre-impulse units
     /// (Newtons / Newton-metres). Populated by every receiver body each
@@ -276,16 +329,17 @@ namespace Latios.Anna.Electromagnetism
     /// re-computing F = ∇(m·B) and τ = m × B on the CPU side.
     ///
     /// Force and torque are stored *before* the per-substep dt multiplier and
-    /// the <c>ElectromagnetismSettings.globalForceScale</c> are applied — so
-    /// arrow lengths reflect the physical Newtons / Newton-metres a designer
-    /// would reason about, not the impulse magnitudes actually fed to Anna.
+    /// the <c>ElectromagnetismSettings.globalForceScale</c> / <c>globalTorqueScale</c>
+    /// are applied — so arrow lengths reflect the physical Newtons / Newton-metres
+    /// a designer would reason about, not the impulse magnitudes actually fed
+    /// to Anna.
     /// </summary>
     public struct MagneticFeedback : IComponentData
     {
         /// <summary>Newtons. <c>F = ∇(m·B)</c> at the body's centre, before the dt × globalForceScale conversion to impulse.</summary>
         public float3 force;
 
-        /// <summary>Newton-metres. <c>τ = m × B</c> at the body's centre, before the dt × globalForceScale conversion to angular impulse.</summary>
+        /// <summary>Newton-metres. <c>τ = m × B</c> at the body's centre, before the dt × globalTorqueScale conversion to angular impulse.</summary>
         public float3 torque;
     }
 }
