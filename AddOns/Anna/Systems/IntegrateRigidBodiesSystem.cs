@@ -172,7 +172,7 @@ namespace Latios.Anna.Systems
                     rigidBody.velocity.linear = float3.zero;
                 if (!math.all(math.isfinite(state.velocity.angular)))
                     rigidBody.velocity.angular = float3.zero;
-                UnitySim.Integrate(ref state.inertialPoseWorldTransform, ref state.velocity, state.linearDamping, state.angularDamping, deltaTime);
+                UnitySim.Integrate(ref state.inertialPoseWorldTransform, ref state.velocity, state.linearDamping, state.angularDamping, deltaTime * state.timeScale);
                 transform = UnitySim.ApplyInertialPoseWorldTransformDeltaToWorldTransform(transform,
                                                                                           in previousInertialPose,
                                                                                           in state.inertialPoseWorldTransform);
