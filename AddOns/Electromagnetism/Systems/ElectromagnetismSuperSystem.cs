@@ -41,7 +41,12 @@ namespace Latios.Anna.Electromagnetism.Systems
             GetOrCreateAndAddUnmanagedSystem<FieldGridLifecycleSystem>();
             GetOrCreateAndAddUnmanagedSystem<ClearFieldGridSystem>();
             GetOrCreateAndAddUnmanagedSystem<WriteSourceContributionsSystem>();
-            GetOrCreateAndAddUnmanagedSystem<PropagatePermeabilitySystem>();
+            // Disabled: gameplay-driven magnetism (grav-gun-held magnets, scene-authored
+            // magnetized objects) is fully served by the analytical source stamp in
+            // WriteSourceContributionsSystem. Propagation is only needed when authored
+            // high-μ_r geometry should bend flux through itself. Re-enable + see
+            // PropagatePermeabilitySystem's file-level perf notes before turning on.
+            //GetOrCreateAndAddUnmanagedSystem<PropagatePermeabilitySystem>();
             GetOrCreateAndAddUnmanagedSystem<ComputeReceiverForcesSystem>();
         }
     }
